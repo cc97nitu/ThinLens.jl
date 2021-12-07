@@ -260,10 +260,6 @@ function ChainRulesCore.rrule(::typeof(tM), pold::T, len::Float64, kn::Vector{Fl
     
     function tM_pullback(Δ)
         newΔ = Vector(Δ)
-        # knl = len .* kn; ksl = len .* ks
-        
-        # newGrad[1] += (-knl[2] - knl[3]*pold[1] + ksl[3]*pold[3]) * grad[2] + (ksl[2] + ksl[3]*pold[1] + knl[3]*pold[3]) * grad[4]
-        # newGrad[3] += (ksl[2] + knl[3]*pold[3] + ksl[3]*pold[1]) * grad[2] + (knl[2] - ksl[3]*pold[3] + knl[3]*pold[1]) * grad[4]
 
         x = pold[1]; y = pold[3]
 
@@ -282,15 +278,11 @@ function ChainRulesCore.rrule(::typeof(tM), pold::T, len::Float64, kn::Vector{Fl
         dpyy = kn[end]
         for i = length(kn)-1:-1:2
             zre = (dpxy * x - dpyy * y) / (i-1)
-            zim = (dpyy * y + dpxy * x) / (i-1)
-            dpxy = zre + kn[i]
-            dpyy = zim + ks[i]
+            zim = (dpxy * y + dpyy * x) / (i-1)
+            dpxy = zre - ks[i]
+            dpyy = zim + kn[i]
         end
 
-        # dpxx *= -len; dpxy *= -len
-        # dpyx *= len; dpyy *= len
- 
-        
         newΔ[1] -= len * dpxx * Δ[2] + len * dpxy * Δ[4]
         newΔ[3] += len * dpyx * Δ[2] + len * dpyy * Δ[4]
         
