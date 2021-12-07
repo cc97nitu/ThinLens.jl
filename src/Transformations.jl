@@ -13,7 +13,7 @@ function driftLinear(p::T, len::Float64) where {T<:AbstractArray{Float64}}
 end
 
 function ChainRulesCore.rrule(::typeof(driftLinear), pold::T, len::Float64) where {T<:AbstractArray{Float64}}
-    p = drift(pold, len)
+    p = driftLinear(pold, len)
     function driftLinear_pullback(Δ)
         newΔ = Vector(Δ)
 
@@ -32,21 +32,9 @@ Apply analytic drift to particle coordinates.
 """
 function driftExact(p::T, len::Float64) where {T<:AbstractArray{Float64}}
     pnew = Vector(p)
-    x = p[1]; px = p[2]; y = p[3]; py = p[4]; δ = p[6]; vR = p[7]
+    px = p[2]; py = p[4]; δ = p[6]; vR = p[7]
     
     pz = sqrt((1 + δ)^2 - px^2 - py^2)
-    println("px: ", px, "py: ", py, "δ: ", δ)
-    # try
-    #     pz = sqrt((1 + δ)^2 - px^2 - py^2)
-    # catch e
-    #     if e isa DomainError
-    #         println("DomainError")
-
-    #         println("px: ", px, "py: ", py, "δ: ", δ)
-    #     end
-    # finally
-    #     pz = sqrt((1 + δ)^2 - px^2 - py^2)
-    # end
       
     pnew[1] += len * px / pz
     pnew[3] += len * py / pz
@@ -59,16 +47,16 @@ function ChainRulesCore.rrule(::typeof(driftExact), pold::T, len::Float64) where
     p = driftExact(pold, len)
     function driftExact_pullback(Δ)
         newΔ = Vector(Δ)
-        x = pold[1]; px = pold[2]; y = pold[3]; py = pold[4]; δ = pold[6]; vR = pold[7]
+        px = pold[2]; py = pold[4]; δ = pold[6]; vR = pold[7]
         
         pz = sqrt((1+δ)^2 - px^2 - py^2)
         lOpz2 = len / pz^2
         
-        newΔ[2] += lOpz2 * ((pz + px^2/pz) * Δ[1] - (py * Δ[3] - vR*(1+δ) * Δ[5]) * px/pz)
-        newΔ[4] += lOpz2 * ((pz + py^2/pz) * Δ[3] - (px * Δ[1] - vR*(1+δ) * Δ[5]) * py/pz)
+        newΔ[2] += lOpz2 * ((pz + px^2/pz) * Δ[1] + (py * Δ[3] - vR*(1+δ) * Δ[5]) * px/pz)
+        newΔ[4] += lOpz2 * ((pz + py^2/pz) * Δ[3] + (px * Δ[1] - vR*(1+δ) * Δ[5]) * py/pz)
         
         pOpz = (1+δ) / pz
-        newΔ[6] += lOpz2 * (pOpz * (px * Δ[1] + py * Δ[3]) - vR * (pz - (1+δ)*pOpz) * Δ[5])
+        newΔ[6] -= lOpz2 * (pOpz * (px * Δ[1] + py * Δ[3]) + vR * (pz - (1+δ)*pOpz) * Δ[5])
         
         newΔ[7] -= len * pOpz * Δ[5]
 
@@ -124,7 +112,7 @@ function ChainRulesCore.rrule(::typeof(tM_2ndOrder), pold::T, len::Float64, kn::
         Δksl[2] = pold[3] * grad[2] + pold[1] * grad[4]
         Δksl[3] = pold[1]*pold[3] * grad[2] + (pold[1]^2 - pold[3]^2)/2 * grad[4]
         
-        return ChainRulesCore.NoTangent(), newGrad, ChainRulesCore.NoTangent(), Δknl./len, Δksl./len
+        return ChainRulesCore.NoTangent(), newGrad, ChainRulesCore.NoTangent(), Δknl*len, Δksl*len
     end
     
     return pnew, tM_2ndOrder_pullback
@@ -136,11 +124,11 @@ end
 
 Apply curvature effects to particle.
 """
-function curvatureEffectKick(p::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, α::Float64, β::Float64) where {T<:AbstractArray{Float64}}
+function curvatureEffectKick(p::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64) where {T<:AbstractArray{Float64}}
     pnew = Vector(p)
     
-    hxlx = α * p[1]
-    hyly = β * p[3]
+    hxlx = hx * len * p[1]
+    hyly = hy * len * p[3]
 
     if len != 0.
         hxx = hxlx / len
@@ -150,8 +138,9 @@ function curvatureEffectKick(p::T, len::Float64, kn::Vector{Float64}, ks::Vector
         hyy = 0.
     end
 
-    dpx = α + α * p[6] - kn[1] * len * hxx
-    dpy = -β - β * p[6] + ks[1] * len * hyy
+    dpx = len * (hx + hx * p[6] - kn[1] * hxx)
+    dpy = len * (-hy - hy * p[6] + ks[1] * hyy)
+
     dσ = (hyly - hxlx) * p[7]
     
     # update
@@ -159,26 +148,26 @@ function curvatureEffectKick(p::T, len::Float64, kn::Vector{Float64}, ks::Vector
     pnew[4] += dpy
     pnew[5] += dσ
 
-    println("after curvature", " px: ", pnew[2], " py: ", pnew[4])
+    # println("after curvature", " px: ", pnew[2], " py: ", pnew[4])
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(curvatureEffectKick), pold::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, α::Float64, β::Float64) where {T<:AbstractArray{Float64}}
-    pnew = curvatureEffectKick(pold, len, kn, ks, α, β)
+function ChainRulesCore.rrule(::typeof(curvatureEffectKick), pold::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64) where {T<:AbstractArray{Float64}}
+    pnew = curvatureEffectKick(pold, len, kn, ks, hx, hy)
     
     function curvatureEffectKick_pullback(Δ)
         newΔ = Vector(Δ)
         
-        newΔ[1] -= kn[1]*α * Δ[2] + α*pold[7] * Δ[5]
-        newΔ[2] += ks[2]*β * Δ[4] + β*pold[7] * Δ[5]
-        newΔ[6] += α * Δ[2] - β * Δ[4]
-        newΔ[7] += (β * pold[3] - α * pold[1]) * Δ[5]
+        newΔ[1] -= kn[1]*hx*len * Δ[2] + hx*len*pold[7] * Δ[5]
+        newΔ[2] += ks[2]*hy*len * Δ[4] + hy*len*pold[7] * Δ[5]
+        newΔ[6] += hx*len * Δ[2] - hy*len * Δ[4]
+        newΔ[7] += (hy*len * pold[3] - hx*len * pold[1]) * Δ[5]
         
         Δkn = zeros(length(kn))
-        Δkn[1] -= α * Δ[2]
+        Δkn[1] -= hx*len * Δ[2]
         
         Δks = zeros(length(ks))
-        Δks[1] += β * Δ[4]
+        Δks[1] += hy*len * Δ[4]
         
         return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), Δkn, Δks, ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent()
     end

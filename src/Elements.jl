@@ -38,7 +38,7 @@ mutable struct Quadrupole <: Magnet
     splitScheme::SplitScheme
 end
 
-Quadrupole(len::Number, k1n::Number, k1s::Number) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], o2nd)
+Quadrupole(len::Number, k1n::Number, k1s::Number) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], splitO2nd)
 
 """Sextupole."""
 mutable struct Sextupole <: Magnet
@@ -48,7 +48,7 @@ mutable struct Sextupole <: Magnet
     splitScheme::SplitScheme
 end
 
-Sextupole(len::Number, k2n::Number, k2s::Number) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], o2nd)
+Sextupole(len::Number, k2n::Number, k2s::Number) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], splitO2nd)
 
 """Bending magnet."""
 mutable struct BendingMagnet <: Magnet
@@ -62,9 +62,9 @@ mutable struct BendingMagnet <: Magnet
     splitScheme::SplitScheme
 end
 
-SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, splitScheme::SplitScheme=o2nd) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1, ϵ2, splitScheme)
+SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, splitScheme::SplitScheme=splitO2nd) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1, ϵ2, splitScheme)
 
-RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, splitScheme::SplitScheme=o2nd) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, splitScheme)
+RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, splitScheme::SplitScheme=splitO2nd) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, splitScheme)
 
 function (e::BendingMagnet)(p::T) where {T<:AbstractArray{Float64}}
     # entry pole face
@@ -77,7 +77,7 @@ function (e::BendingMagnet)(p::T) where {T<:AbstractArray{Float64}}
         # kick
         if d != 0
             p = tM_2ndOrder(p, d * e.len, e.kn, e.ks)
-            p = curvatureEffectKick(p, d * e.len, e.kn, e.ks, e.α, e.β)
+            p = curvatureEffectKick(p, d * e.len, e.kn, e.ks, e.α/e.len, e.β/e.len)
         end
     end
 
