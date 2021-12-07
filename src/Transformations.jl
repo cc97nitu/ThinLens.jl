@@ -66,7 +66,7 @@ function ChainRulesCore.rrule(::typeof(driftExact), pold::T, len::Float64) where
 end
 
 """
-    tM_2ndOrder(p::T, length::Float64, knl::Vector{Float64}, ksl::Vector{Float64}) where {T<:AbstractArray{Float64}}
+    tM_2ndOrder(p::T, length::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
 
 Update particle momentum in transversal magnetic fields up to second order.
 """
@@ -231,10 +231,12 @@ function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::T, len::Float64, α::F
     return pnew, dipoleEdge_pullback
 end
 
+"""
+    thinMultipole(p::T, length::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
 
-
-#####################################################
-function tM(p::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
+Update particle momentum in transversal magnetic field up to arbitrary order.
+"""
+function thinMultipole(p::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
     pnew = Vector(p)
 
     dpx = kn[end]
@@ -255,39 +257,67 @@ function tM(p::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where 
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(tM), pold::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
-    pnew = tM(pold, len, kn, ks)
+function ChainRulesCore.rrule(::typeof(thinMultipole), pold::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
+    pnew = thinMultipole(pold, len, kn, ks)
     
-    function tM_pullback(Δ)
+    function thinMultipole_pullback(Δ)
         newΔ = Vector(Δ)
 
         x = pold[1]; y = pold[3]
 
         # dpx/dx and dpy/dx
-        dpxx = kn[end]
-        dpyx = ks[end]
+        δpx_δx = kn[end]
+        δpy_δx = ks[end]
         for i = length(kn)-1:-1:2
-            zre = (dpxx * x - dpyx * y) / (i-1)
-            zim = (dpxx * y + dpyx * x) / (i-1)
-            dpxx = zre + kn[i]
-            dpyx = zim + ks[i]
+            zre = (δpx_δx * x - δpy_δx * y) / (i-1)
+            zim = (δpx_δx * y + δpy_δx * x) / (i-1)
+            δpx_δx = zre + kn[i]
+            δpy_δx = zim + ks[i]
         end
 
         # dpx/dy and dpy/dy
-        dpxy = -ks[end]
-        dpyy = kn[end]
+        δpx_δy = -ks[end]
+        δpy_δy = kn[end]
         for i = length(kn)-1:-1:2
-            zre = (dpxy * x - dpyy * y) / (i-1)
-            zim = (dpxy * y + dpyy * x) / (i-1)
-            dpxy = zre - ks[i]
-            dpyy = zim + kn[i]
+            zre = (δpx_δy * x - δpy_δy * y) / (i-1)
+            zim = (δpx_δy * y + δpy_δy * x) / (i-1)
+            δpx_δy = zre - ks[i]
+            δpy_δy = zim + kn[i]
         end
 
-        newΔ[1] -= len * dpxx * Δ[2] + len * dpxy * Δ[4]
-        newΔ[3] += len * dpyx * Δ[2] + len * dpyy * Δ[4]
-        
-        return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent()
+        newΔ[1] -= len * (δpx_δx * Δ[2] + δpx_δy * Δ[4])
+        newΔ[3] += len * (δpy_δx * Δ[2] + δpy_δy * Δ[4])
+
+        # pullback for normal multipole strengths
+        Δkn = zeros(length(kn))
+        Δkn[1] = -len * Δ[2]
+
+        δpx_δkn = 1
+        δpy_δkn = 0
+        for i in 2:1:length(kn)
+            zre = (δpx_δkn * x - δpy_δkn * y) / (i-1)
+            zim = (δpx_δkn * y + δpy_δkn * x) / (i-1)
+            δpx_δkn = zre
+            δpy_δkn = zim
+            Δkn[i] = len * (-δpx_δkn * Δ[2] + δpy_δkn * Δ[4])
+        end
+
+        # pullback for skew multiople strengths
+        Δks = zeros(length(ks))
+        Δks[1] = len * Δ[4]
+
+        δpx_δks = 0
+        δpy_δks = -1
+        for i = 2:1:length(ks)
+            zre = (δpx_δks * x - δpy_δks * y) / (i-1)
+            zim = (δpx_δks * y + δpy_δks * x) / (i-1)
+            δpx_δks = zre
+            δpy_δks = zim
+            Δks[i] = len * (δpx_δks * Δ[2] - δpy_δks * Δ[4])
+        end
+
+        return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), Δkn, Δks
     end
     
-    return pnew, tM_pullback
+    return pnew, thinMultipole_pullback
 end

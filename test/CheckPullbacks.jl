@@ -57,10 +57,13 @@ jaxFlux_tM_curvatureEffectKick = Flux.jacobian(wrap_tM_2ndOrder, particle, kn, k
 
 
 #########
-wrap_tM(p) = ThinLens.tM(p, 3.0, kn, ks)
+wrap_thinMultipole(p, kn, ks) = ThinLens.thinMultipole(p, 0.1, kn, ks)
 
-jaxFD_tM = FD.jacobian(fdm, wrap_tM, particle)
-jaxFlux_tM = Flux.jacobian(wrap_tM, particle)
+kn = [0.1, 0.5, -0.2]
+ks = [-0.05, 0.3, 0.8]
 
-@test compareJacobians(jaxFD_tM, jaxFlux_tM)
+jaxFD_thinMultipole = FD.jacobian(fdm, wrap_thinMultipole, particle, kn, ks)
+jaxFlux_thinMultipole = Flux.jacobian(wrap_thinMultipole, particle, kn, ks)
+
+@test compareJacobians(jaxFD_thinMultipole, jaxFlux_thinMultipole)
 
