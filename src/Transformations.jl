@@ -230,3 +230,72 @@ function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::T, len::Float64, α::F
     
     return pnew, dipoleEdge_pullback
 end
+
+
+
+#####################################################
+function tM(p::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
+    pnew = Vector(p)
+
+    dpx = kn[end]
+    dpy = ks[end]
+    
+    # assumes kn, ks are of same length
+    for i = length(kn)-1:-1:1
+        zre = (dpx * p[1] - dpy * p[3]) / i
+        zim = (dpx * p[3] + dpy * p[1]) / i
+        dpx = kn[i] + zre
+        dpy = ks[i] + zim
+    end
+    
+    # update
+    pnew[2] -= len * dpx
+    pnew[4] += len * dpy
+    
+    return pnew
+end
+
+function ChainRulesCore.rrule(::typeof(tM), pold::T, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}) where {T<:AbstractArray{Float64}}
+    pnew = tM(pold, len, kn, ks)
+    
+    function tM_pullback(Δ)
+        newΔ = Vector(Δ)
+        # knl = len .* kn; ksl = len .* ks
+        
+        # newGrad[1] += (-knl[2] - knl[3]*pold[1] + ksl[3]*pold[3]) * grad[2] + (ksl[2] + ksl[3]*pold[1] + knl[3]*pold[3]) * grad[4]
+        # newGrad[3] += (ksl[2] + knl[3]*pold[3] + ksl[3]*pold[1]) * grad[2] + (knl[2] - ksl[3]*pold[3] + knl[3]*pold[1]) * grad[4]
+
+        x = pold[1]; y = pold[3]
+
+        # dpx/dx and dpy/dx
+        dpxx = kn[end]
+        dpyx = ks[end]
+        for i = length(kn)-1:-1:2
+            zre = (dpxx * x - dpyx * y) / (i-1)
+            zim = (dpxx * y + dpyx * x) / (i-1)
+            dpxx = zre + kn[i]
+            dpyx = zim + ks[i]
+        end
+
+        # dpx/dy and dpy/dy
+        dpxy = -ks[end]
+        dpyy = kn[end]
+        for i = length(kn)-1:-1:2
+            zre = (dpxy * x - dpyy * y) / (i-1)
+            zim = (dpyy * y + dpxy * x) / (i-1)
+            dpxy = zre + kn[i]
+            dpyy = zim + ks[i]
+        end
+
+        # dpxx *= -len; dpxy *= -len
+        # dpyx *= len; dpyy *= len
+ 
+        
+        newΔ[1] -= len * dpxx * Δ[2] + len * dpxy * Δ[4]
+        newΔ[3] += len * dpyx * Δ[2] + len * dpyy * Δ[4]
+        
+        return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent()
+    end
+    
+    return pnew, tM_pullback
+end

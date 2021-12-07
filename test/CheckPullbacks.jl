@@ -53,3 +53,14 @@ jaxFlux_tM_curvatureEffectKick = Flux.jacobian(wrap_tM_2ndOrder, particle, kn, k
 
 @test compareJacobians(jaxFD_tM_curvatureEffectKick, jaxFlux_tM_curvatureEffectKick)
 
+
+
+
+#########
+wrap_tM(p) = ThinLens.tM(p, 3.0, kn, ks)
+
+jaxFD_tM = FD.jacobian(fdm, wrap_tM, particle)
+jaxFlux_tM = Flux.jacobian(wrap_tM, particle)
+
+@test compareJacobians(jaxFD_tM, jaxFlux_tM)
+
