@@ -22,8 +22,8 @@ function (e::Magnet)(p::T) where {T<:AbstractArray{Float64}}
     
         # kick
         if d != 0
-            p = tM_2ndOrder(p, d * e.len, e.kn, e.ks)
-            # thinMultipole!(p, d * e.len, e.kn[1], e.ks[1], 0., 0.)
+            # p = tM_2ndOrder(p, d * e.len, e.kn, e.ks)
+            p = thinMultipole(p, d * e.len, e.kn, e.ks)
         end
     end
 
