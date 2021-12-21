@@ -4,11 +4,12 @@ particle = [-8.16e-03, -1.78e-03,  5.55e-03,  1.93e-03,  0.00e+00,  7.87e-04, 9.
 fdm = FD.central_fdm(5, 1)
 
 function compareJacobians(jacs1, jacs2)
-    for (j1, j2) in zip(jacs1, jacs2)
+    for (i, (j1, j2)) in enumerate(zip(jacs1, jacs2))
         diff = j1 .- j2
         
         if any(x -> abs(x)>1e-9, diff)
             display(diff)
+            println("\nerror at gradient $i")
             return false
         end
     end
@@ -32,21 +33,10 @@ jaxFlux_driftExact = Flux.jacobian(wrap_driftExact, particle)
 
 @test compareJacobians(jaxFD_driftExact, jaxFlux_driftExact)
 
-
-# # test tM_2ndOrder
-# wrap_tM_2ndOrder(p, kn, ks) = ThinLens.tM_2ndOrder(p, 10., kn, ks)
-# kn = [0.1, 0.5, -0.2]
-# ks = [-0.05, 0.3, 0.8]
-
-# jaxFD_tM_2ndOrder = FD.jacobian(fdm, wrap_tM_2ndOrder, particle, kn, ks)
-# jaxFlux_tM_2ndOrder = Flux.jacobian(wrap_tM_2ndOrder, particle, kn, ks)
-
-# @test compareJacobians(jaxFD_tM_2ndOrder, jaxFlux_tM_2ndOrder)
-
 # test curvature Kick
 wrap_curvatureEffectKick(p, kn, ks) = ThinLens.curvatureEffectKick(p, 0.32, kn, ks, 0.1, 0.)
 kn = [0.1, 0.5, -0.2]
-ks = [0.0, 0.3, 0.8]
+ks = [-0.1, 0.3, 0.8]
 
 jaxFD_tM_curvatureEffectKick = FD.jacobian(fdm, wrap_curvatureEffectKick, particle, kn, ks)
 jaxFlux_tM_curvatureEffectKick = Flux.jacobian(wrap_curvatureEffectKick, particle, kn, ks)

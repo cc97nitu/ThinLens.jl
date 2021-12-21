@@ -110,10 +110,10 @@ function ChainRulesCore.rrule(::typeof(curvatureEffectKick), pold::DenseArray{Fl
         newΔ[7,:] .+= (hy.*len .* pold[3,:] .- hx.*len .* pold[1,:]) .* Δ[5,:]
         
         Δkn = zeros(length(kn), size(pnew, 2))
-        Δkn[1,:] .-= hx.*len .* Δ[2,:]
+        Δkn[1,:] .-= hx.*len .* pold[1,:] .* Δ[2,:]
         
         Δks = zeros(length(ks), size(pnew, 2))
-        Δks[1,:] .+= hy.*len .* Δ[4,:]
+        Δks[1,:] .+= hy.*len .* pold[3,:] .* Δ[4,:]
         
         return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), sum(Δkn, dims=2), sum(Δks, dims=2), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent()
     end
