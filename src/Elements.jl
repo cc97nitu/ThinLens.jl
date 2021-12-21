@@ -22,7 +22,6 @@ function (e::Magnet)(p::T) where {T<:AbstractArray{Float64}}
     
         # kick
         if d != 0
-            # p = tM_2ndOrder(p, d * e.len, e.kn, e.ks)
             p = thinMultipole(p, d * e.len, e.kn, e.ks)
         end
     end
@@ -76,7 +75,7 @@ function (e::BendingMagnet)(p::T) where {T<:AbstractArray{Float64}}
     
         # kick
         if d != 0
-            p = tM_2ndOrder(p, d * e.len, e.kn, e.ks)
+            p = thinMultipole(p, d * e.len, e.kn, e.ks)
             p = curvatureEffectKick(p, d * e.len, e.kn, e.ks, e.α/e.len, e.β/e.len)
         end
     end
