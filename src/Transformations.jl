@@ -67,62 +67,6 @@ end
 
 
 """
-    curvatureEffectKick(particle, length, knl::Vector{Float64, ksl::Vector{Float64}, α::Float64, β::Float64})
-
-Apply curvature effects to particle.
-"""
-function curvatureEffectKick(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64)
-    pnew = copy(p)
-    
-    hxlx = hx .* len .* p[1,:]
-    hyly = hy .* len .* p[3,:]
-
-    if len != 0.
-        hxx = hxlx ./ len
-        hyy = hyly ./ len
-    else  # non physical weak focusing disabled (SixTrack mode)
-        hxx = 0.
-        hyy = 0.
-    end
-
-    dpx = len .* (hx .+ hx .* p[6,:] .- kn[1,:] .* hxx)
-    dpy = len .* (-hy .- hy .* p[6,:] .+ ks[1,:] .* hyy)
-
-    dσ = (hyly .- hxlx) .* p[7,:]
-    
-    # update
-    pnew[2,:] .+= dpx
-    pnew[4,:] .+= dpy
-    pnew[5,:] .+= dσ
-
-    return pnew
-end
-
-function ChainRulesCore.rrule(::typeof(curvatureEffectKick), pold::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64)
-    pnew = curvatureEffectKick(pold, len, kn, ks, hx, hy)
-    
-    function curvatureEffectKick_pullback(Δ)
-        newΔ = copy(Δ)
-        
-        newΔ[1,:] .-= kn[1,:].*hx.*len .* Δ[2,:] .+ hx.*len.*pold[7,:] .* Δ[5,:]
-        newΔ[2,:] .+= ks[2,:].*hy.*len .* Δ[4,:] .+ hy.*len.*pold[7,:] .* Δ[5,:]
-        newΔ[6,:] .+= hx.*len .* Δ[2,:] .- hy.*len * Δ[4,:]
-        newΔ[7,:] .+= (hy.*len .* pold[3,:] .- hx.*len .* pold[1,:]) .* Δ[5,:]
-        
-        Δkn = zeros(length(kn), size(pnew, 2))
-        Δkn[1,:] .-= hx.*len .* pold[1,:] .* Δ[2,:]
-        
-        Δks = zeros(length(ks), size(pnew, 2))
-        Δks[1,:] .+= hy.*len .* pold[3,:] .* Δ[4,:]
-        
-        return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), sum(Δkn, dims=2), sum(Δks, dims=2), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent()
-    end
-    
-    return pnew, curvatureEffectKick_pullback
-end
-
-
-"""
     dipoleEdge(p::T, curvature, edgeAngle, hgap, fint)
 
 Kick particles due to dipole edge effects.
@@ -249,7 +193,7 @@ function ChainRulesCore.rrule(::typeof(thinMultipole), pold::DenseArray{Float64}
             Δkn[i,:] = len .* (-δpx_δkn .* Δ[2,:] .+ δpy_δkn .* Δ[4,:])
         end
 
-        # pullback for skew multiople strengths
+        # pullback for skew multipole strengths
         Δks = zeros(length(ks), size(pold, 2))
         Δks[1,:] = len .* Δ[4,:]
 
@@ -268,3 +212,118 @@ function ChainRulesCore.rrule(::typeof(thinMultipole), pold::DenseArray{Float64}
     
     return pnew, thinMultipole_pullback
 end
+
+function thinMultipole(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64)
+    pnew = copy(p)
+
+    dpx = kn[end]
+    dpy = ks[end]
+    
+    # assumes kn, ks are of same length
+    for i = length(kn)-1:-1:1
+        zre = (dpx .* p[1,:] .- dpy .* p[3,:]) ./ i
+        zim = (dpx .* p[3,:] .+ dpy .* p[1,:]) ./ i
+        dpx = kn[i] .+ zre
+        dpy = ks[i] .+ zim
+    end
+    
+    # curvature effects
+    hxlx = hx .* len .* p[1,:]
+    hyly = hy .* len .* p[3,:]
+
+    if len != 0.
+        hxx = hxlx ./ len
+        hyy = hyly ./ len
+    else  # non physical weak focusing disabled (SixTrack mode)
+        hxx = 0.
+        hyy = 0.
+    end
+
+    dpx .= len .* (-dpx .+ hx .+ hx .* p[6,:] .- kn[1,:] .* hxx)
+    dpy .= len .* (dpy .- hy .- hy .* p[6,:] .+ ks[1,:] .* hyy)
+
+    dσ = (hyly .- hxlx) .* p[7,:]
+    
+    # update
+    pnew[2,:] .+= dpx
+    pnew[4,:] .+= dpy
+    pnew[5,:] .+= dσ
+
+    return pnew
+end
+
+function ChainRulesCore.rrule(::typeof(thinMultipole), pold::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64)
+    pnew = thinMultipole(pold, len, kn, ks, hx, hy)
+    
+    function thinMultipole_pullback(Δ)
+        newΔ = copy(Δ)
+
+        x = pold[1,:]; y = pold[3,:]
+
+        # dpx/dx and dpy/dx
+        δpx_δx = kn[end]
+        δpy_δx = ks[end]
+        for i = length(kn)-1:-1:2
+            zre = (δpx_δx .* x .- δpy_δx .* y) ./ (i-1)
+            zim = (δpx_δx .* y .+ δpy_δx .* x) ./ (i-1)
+            δpx_δx = zre .+ kn[i]
+            δpy_δx = zim .+ ks[i]
+        end
+
+        # dpx/dy and dpy/dy
+        δpx_δy = -ks[end]
+        δpy_δy = kn[end]
+        for i = length(kn)-1:-1:2
+            zre = (δpx_δy .* x .- δpy_δy .* y) ./ (i-1)
+            zim = (δpx_δy .* y .+ δpy_δy .* x) ./ (i-1)
+            δpx_δy = zre .- ks[i]
+            δpy_δy = zim .+ kn[i]
+        end
+
+        newΔ[1,:] .-= len .* (δpx_δx .* Δ[2,:] .+ δpx_δy .* Δ[4,:])
+        newΔ[3,:] .+= len .* (δpy_δx .* Δ[2,:] .+ δpy_δy .* Δ[4,:])
+
+        # pullback for normal multipole strengths
+        Δkn = zeros(length(kn), size(pold, 2))
+        Δkn[1] = -len .* Δ[2]
+
+        δpx_δkn = 1
+        δpy_δkn = 0
+        for i in 2:1:length(kn)
+            zre = (δpx_δkn .* x .- δpy_δkn .* y) ./ (i-1)
+            zim = (δpx_δkn .* y .+ δpy_δkn .* x) ./ (i-1)
+            δpx_δkn = zre
+            δpy_δkn = zim
+            Δkn[i,:] = len .* (-δpx_δkn .* Δ[2,:] .+ δpy_δkn .* Δ[4,:])
+        end
+
+        # pullback for skew multiople strengths
+        Δks = zeros(length(ks), size(pold, 2))
+        Δks[1,:] = len .* Δ[4,:]
+
+        δpx_δks = 0
+        δpy_δks = -1
+        for i = 2:1:length(ks)
+            zre = (δpx_δks .* x .- δpy_δks .* y) ./ (i-1)
+            zim = (δpx_δks .* y .+ δpy_δks .* x) ./ (i-1)
+            δpx_δks = zre
+            δpy_δks = zim
+            Δks[i,:] = len .* (δpx_δks .* Δ[2,:] .- δpy_δks .* Δ[4,:])
+        end
+
+        # curvature effects        
+        newΔ[1,:] .-= kn[1,:].*hx.*len .* Δ[2,:] .+ hx.*len.*pold[7,:] .* Δ[5,:]
+        newΔ[2,:] .+= ks[2,:].*hy.*len .* Δ[4,:] .+ hy.*len.*pold[7,:] .* Δ[5,:]
+        newΔ[6,:] .+= hx.*len .* Δ[2,:] .- hy.*len * Δ[4,:]
+        newΔ[7,:] .+= (hy.*len .* pold[3,:] .- hx.*len .* pold[1,:]) .* Δ[5,:]
+        
+        Δkn[1,:] .-= hx.*len .* pold[1,:] .* Δ[2,:]
+        
+        Δks[1,:] .+= hy.*len .* pold[3,:] .* Δ[4,:]
+        
+        return ChainRulesCore.NoTangent(), newΔ, ChainRulesCore.NoTangent(), sum(Δkn, dims=2), sum(Δks, dims=2), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent()
+    end
+
+    return pnew, thinMultipole_pullback
+end
+    
