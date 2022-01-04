@@ -32,6 +32,9 @@ function track(model::Flux.Chain, batch::DenseArray)::PermutedDimsArray
     return PermutedDimsArray(out, (1,3,2))  # dim, BPM, particle
 end
 
+precompile(track, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{Drift, BendingMagnet, Drift, BendingMagnet, Drift, Sextupole, Drift, Quadrupole, Drift, Quadrupole, Drift, Sextupole, Drift, Drift, Drift}}}}, Vector{Float64}))
+precompile(track, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{Drift, BendingMagnet, Drift, BendingMagnet, Drift, Sextupole, Drift, Quadrupole, Drift, Quadrupole, Drift, Sextupole, Drift, Drift, Drift}}}}, Matrix{Float64}))
+
 """
     assignMasks(model; nested=true, quadMask=nothing, sextMask=nothing)::IdDict{Vector{Float64}, Vector{Float64}}
 
