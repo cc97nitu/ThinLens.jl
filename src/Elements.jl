@@ -29,6 +29,35 @@ function (e::Magnet)(p::T) where {T<:AbstractArray{Float64}}
     return p
 end
 
+"""
+    setMultipole!(magnet::Magnet, order::Int, kn::Number, ks::Number)
+
+Set normal and skew multipole values for given order.
+
+# Arguments
+- 'order::Int': order of multipole, e.g. 1st for quadrupoles, 3rd for octupoles.
+"""
+function setMultipole!(magnet::Magnet, order::Int, kn::Number, ks::Number)
+    if length(magnet.kn) < order + 1
+        # need to extend multipole array
+        newKn = zeros(order + 1); newKs = zeros(order + 1)
+        
+        for (i, kn) in enumerate(magnet.kn)
+            newKn[i] = kn
+        end
+
+        for (i, ks) in enumerate(magnet.ks)
+            newKs[i] = ks
+        end
+
+        magnet.kn = newKn
+        magnet.ks = newKs
+    end
+
+    magnet.kn[order + 1] = kn
+    magnet.ks[order + 1] = ks
+end
+
 """Quadrupole."""
 mutable struct Quadrupole <: Magnet
     len::Float64
@@ -37,7 +66,7 @@ mutable struct Quadrupole <: Magnet
     splitScheme::SplitScheme
 end
 
-Quadrupole(len::Number, k1n::Number, k1s::Number) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], splitO2nd)
+Quadrupole(len::Number, k1n::Number, k1s::Number; split=splitO2nd) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], split)
 
 """Sextupole."""
 mutable struct Sextupole <: Magnet
@@ -47,7 +76,7 @@ mutable struct Sextupole <: Magnet
     splitScheme::SplitScheme
 end
 
-Sextupole(len::Number, k2n::Number, k2s::Number) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], splitO2nd)
+Sextupole(len::Number, k2n::Number, k2s::Number; split=splitO2nd) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], split)
 
 """Bending magnet."""
 mutable struct BendingMagnet <: Magnet

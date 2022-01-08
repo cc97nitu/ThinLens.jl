@@ -27,3 +27,21 @@ coeffC = [w3 / 2, (w3 + w2) / 2, (w2 + w1) / 2, (w1 + w0) / 2, (w1 + w0) / 2, (w
                (w3 + w2) / 2, w3 / 2]
 coeffD = [w3, w2, w1, w0, w1, w2, w3, 0]
 const splitO6th = SplitScheme(coeffC, coeffD)
+
+# 8th order symplectic integrator by Yoshida
+w1 = 0.102799849391985E0
+w2 = -0.196061023297549E1
+w3 = 0.193813913762276E1
+w4 = -0.158240635368243E0
+w5 = -0.144485223686048E1
+w6 = 0.253693336566229E0
+w7 = 0.914844246229740E0
+w0 = 1 - 2 * (w1 + w2 + w3 + w4 + w5 + w6 + w7)
+
+coeffC = [w7 / 2, (w7 + w6) / 2, (w6 + w5) / 2, (w5 + w4) / 2, (w4 + w3) / 2, (w3 + w2) / 2,
+                           (w2 + w1) / 2, (w1 + w0) / 2]
+coeffC = [coeffC..., reverse(coeffC)...]
+
+coeffD = [w7, w6, w5, w4, w3, w2, w1]
+coeffD = [coeffD..., w0, reverse(coeffD)..., 0.]
+const splitO8th = SplitScheme(coeffC, coeffD)
