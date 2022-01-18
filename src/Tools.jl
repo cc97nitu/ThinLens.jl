@@ -43,6 +43,53 @@ function getTuneChroma_fft(model, beam::TL.Beam, turns::Int)
     return (xFit.b, yFit.b), (xFit.a, yFit.a)
 end
 
+"""
+    getTuneChroma_nested(model, beam::TL.Beam, turns::Int)
+
+Perform FFT of particle positions to obtain tune / chromaticities from linear fit.
+This function assumes a nested model with equally spaced outputs.
+"""
+function getTuneChroma_nested(model, beam::TL.Beam, turns::Int)
+    # create particles
+    particles = zeros(7, 5)
+    particles[1,:] .= 1e-6
+    particles[3,:] .= 1e-6
+    particles[6,:] .= [-5e-3, -5e-4, 0., 5e-4, 5e-3]
+    
+    # adapt velocity ratio β0/β
+    p = beam.p .* (1. .+ particles[6,:])  # GeV/c
+    E = sqrt.(p.^2 .+ beam.mass^2)  # GeV
+    γ = E ./ beam.mass
+    β = p ./ (γ .* beam.mass)
+    particles[7,:] .= beam.beta ./ β
+    
+    # observe horizontal / vertical motion
+    pos = Array{Float64}(undef, 2, turns*length(model), size(particles, 2))
+    
+    coords = particles
+    for turn in 0:turns-1
+        global track = TL.track(model, coords)
+
+        idx = turn*length(model)+1
+        pos[:,idx:idx+length(model)-1,:] = track[[1,3],:,:]  # x,y only
+        
+        coords = track[:,end,:]
+    end
+    
+    # observe maximum frequency (=tune)
+    freqs = FFTW.rfftfreq(turns*length(model), length(model))
+    fft = FFTW.rfft(pos .- Statistics.mean(pos, dims=2), 2)  # remove dispersion
+    
+    xTunes = [freqs[argmax(abs.(fft[1,:,i]))] for i in 1:size(particles)[2]]
+    yTunes = [freqs[argmax(abs.(fft[2,:,i]))] for i in 1:size(particles)[2]]
+    
+    # fit tune and chroma
+    xFit = EasyFit.fitlinear(particles[6,:], xTunes)
+    yFit = EasyFit.fitlinear(particles[6,:], yTunes)
+
+    return (xFit.b, yFit.b), (xFit.a, yFit.a)
+end
+
 precompile(getTuneChroma_fft, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{TL.Drift, TL.BendingMagnet, TL.Drift, TL.BendingMagnet, TL.Drift, TL.Sextupole, TL.Drift, TL.Quadrupole, TL.Drift, TL.Quadrupole, TL.Drift, TL.Sextupole, TL.Drift, TL.Drift, TL.Drift}}}},
 TL.Beam, Int))
 
