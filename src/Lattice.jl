@@ -6,10 +6,10 @@ module Lattice
 import Flux
 import ThinLens
 
-function SIS18_Cell_minimal(k1f::Float64, k1d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd)
+function SIS18_Cell_minimal(k1f::Float64, k1d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     bendingAngle = 0.2617993878
-    rb1 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0)
-    rb2 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0)
+    rb1 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0; split=split, steps=steps)
+    rb2 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0; split=split, steps=steps)
 
     d1 = ThinLens.Drift(0.645)
     d2 = ThinLens.Drift(0.9700000000000002)
@@ -18,8 +18,8 @@ function SIS18_Cell_minimal(k1f::Float64, k1d::Float64; split::ThinLens.SplitSch
     d5 = ThinLens.Drift(0.7097999999999978)
     d6 = ThinLens.Drift(0.49979999100000283)
 
-    qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split)
-    qs2d = ThinLens.Quadrupole(1.04, k1d, 0; split=split)
+    qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split, steps=steps)
+    qs2d = ThinLens.Quadrupole(1.04, k1d, 0; split=split, steps=steps)
 
 
     qs3t = ThinLens.Drift(0.4804)
@@ -29,39 +29,39 @@ function SIS18_Cell_minimal(k1f::Float64, k1d::Float64; split::ThinLens.SplitSch
 end
 
 
-function SIS18_Lattice_minimal(k1f::Float64, k1d::Float64; nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd)
+function SIS18_Lattice_minimal(k1f::Float64, k1d::Float64; nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     if nested
         if cellsIdentical
-            cell = SIS18_Cell_minimal(k1f, k1d; split=split)
+            cell = SIS18_Cell_minimal(k1f, k1d; split=split, steps=steps)
             return ThinLens.NestedChain([cell for _ in 1:12])
         else
-            return ThinLens.NestedChain([SIS18_Cell_minimal(k1f, k1d; split=split) for _ in 1:12])
+            return ThinLens.NestedChain([SIS18_Cell_minimal(k1f, k1d; split=split, steps=steps) for _ in 1:12])
         end
     else
         if cellsIdentical
-            cell = SIS18_Cell_minimal(k1f, k1d; split=split)
+            cell = SIS18_Cell_minimal(k1f, k1d; split=split, steps=steps)
             return ThinLens.FlatChain([cell for _ in 1:12])
         else
-            return ThinLens.FlatChain([SIS18_Cell_minimal(k1f, k1d; split=split) for _ in 1:12])
+            return ThinLens.FlatChain([SIS18_Cell_minimal(k1f, k1d; split=split, steps=steps) for _ in 1:12])
         end
     end
 end
 
 
-function SIS18_Cell(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd)
+function SIS18_Cell(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     # bending magnets
     bendingAngle = 0.2617993878
-    rb1 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0)
-    rb2 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0)
+    rb1 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0; split=split, steps=steps)
+    rb2 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0; split=split, steps=steps)
 
     # quadrupoles
-    qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split)
-    qs2d = ThinLens.Quadrupole(1.04, k1d, 0; split=split)
+    qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split, steps=steps)
+    qs2d = ThinLens.Quadrupole(1.04, k1d, 0; split=split, steps=steps)
     qs3t = ThinLens.Drift(0.4804)
 
     # sextupoles
-    ks1c = ThinLens.Sextupole(0.32, k2f, 0; split=split)
-    ks3c = ThinLens.Sextupole(0.32, k2d, 0; split=split)
+    ks1c = ThinLens.Sextupole(0.32, k2f, 0; split=split, steps=steps)
+    ks3c = ThinLens.Sextupole(0.32, k2d, 0; split=split, steps=steps)
    
     # drifts
     d1 = ThinLens.Drift(0.66355)
@@ -81,21 +81,21 @@ end
 
 
 function SIS18_Lattice(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
-    nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd)
+    nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=steps)
 
     if nested
         if cellsIdentical
-            cell = SIS18_Cell(k1f, k1d, k2f, k2d; split=split)
+            cell = SIS18_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps)
             return ThinLens.NestedChain([cell for _ in 1:12])
         else
-            return ThinLens.NestedChain([SIS18_Cell(k1f, k1d, k2f, k2d; split=split) for _ in 1:12])
+            return ThinLens.NestedChain([SIS18_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps) for _ in 1:12])
         end
     else
         if cellsIdentical
-            cell = SIS18_Cell(k1f, k1d, k2f, k2d; split=split)
+            cell = SIS18_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps)
             return ThinLens.FlatChain([cell for _ in 1:12])
         else
-            return ThinLens.FlatChain([SIS18_Cell(k1f, k1d, k2f, k2d; split=split) for _ in 1:12])
+            return ThinLens.FlatChain([SIS18_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps) for _ in 1:12])
         end
     end
 end

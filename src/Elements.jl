@@ -16,13 +16,16 @@ end
 abstract type Magnet <: BeamlineElement end
 
 function (e::Magnet)(p::T) where {T<:AbstractArray{Float64}}
-    for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
-        # drift
-        p = driftExact(p, c * e.len)
-    
-        # kick
-        if d != 0
-            p = thinMultipole(p, d * e.len, e.kn, e.ks)
+    stepLength = e.len / e.steps
+    for _ in 1:e.steps        
+        for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
+            # drift
+            p = driftExact(p, c * stepLength)
+        
+            # kick
+            if d != 0
+                p = thinMultipole(p, d * stepLength, e.kn, e.ks)
+            end
         end
     end
 
@@ -64,9 +67,10 @@ mutable struct Quadrupole <: Magnet
     kn::Vector{Float64}
     ks::Vector{Float64}
     splitScheme::SplitScheme
+    steps::Int
 end
 
-Quadrupole(len::Number, k1n::Number, k1s::Number; split=splitO2nd) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], split)
+Quadrupole(len::Number, k1n::Number, k1s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], split, steps)
 
 """Sextupole."""
 mutable struct Sextupole <: Magnet
@@ -74,9 +78,10 @@ mutable struct Sextupole <: Magnet
     kn::Vector{Float64}
     ks::Vector{Float64}
     splitScheme::SplitScheme
+    steps::Int
 end
 
-Sextupole(len::Number, k2n::Number, k2s::Number; split=splitO2nd) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], split)
+Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], split, steps)
 
 """Bending magnet."""
 mutable struct BendingMagnet <: Magnet
@@ -88,27 +93,27 @@ mutable struct BendingMagnet <: Magnet
     ϵ1::Float64
     ϵ2::Float64
     splitScheme::SplitScheme
+    steps::Int
 end
 
-SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, splitScheme::SplitScheme=splitO2nd) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1, ϵ2, splitScheme)
+SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1, ϵ2, split, steps)
 
-RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, splitScheme::SplitScheme=splitO2nd) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, splitScheme)
+RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, split, steps)
 
 function (e::BendingMagnet)(p::T) where {T<:AbstractArray{Float64}}
     # entry pole face
     p = dipoleEdge(p, e.len, e.α, e.ϵ1)
 
-    for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
-        # drift
-        p = driftExact(p, c * e.len)
-    
-        # kick
-        if d != 0
-            # p = thinMultipole(p, d * e.len, e.kn, e.ks)
-            # p = curvatureEffectKick(p, d * e.len, e.kn, e.ks, e.α/e.len, e.β/e.len)
-
-            p = thinMultipole(p, d * e.len, e.kn, e.ks, e.α/e.len, e.β/e.len)
-
+    stepLength = e.len / e.steps
+    for _ in 1:e.steps
+        for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
+            # drift
+            p = driftExact(p, c * stepLength)
+        
+            # kick
+            if d != 0
+                p = thinMultipole(p, d * stepLength, e.kn, e.ks, e.α/e.len, e.β/e.len)
+            end
         end
     end
 
