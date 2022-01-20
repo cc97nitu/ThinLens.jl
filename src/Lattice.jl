@@ -81,7 +81,7 @@ end
 
 
 function SIS18_Lattice(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
-    nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=steps)
+    nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
 
     if nested
         if cellsIdentical
