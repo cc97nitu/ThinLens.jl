@@ -93,4 +93,26 @@ end
 precompile(getTuneChroma_fft, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{TL.Drift, TL.BendingMagnet, TL.Drift, TL.BendingMagnet, TL.Drift, TL.Sextupole, TL.Drift, TL.Quadrupole, TL.Drift, TL.Quadrupole, TL.Drift, TL.Sextupole, TL.Drift, TL.Drift, TL.Drift}}}},
 TL.Beam, Int))
 
+"""
+    getTunes_jacobian(model)
+
+Calculate tunes of nested model by linearizing the one-turn map with reverse-mode AD.
+"""
+function getTunes_jacobian(model)
+    origin = zeros(7)
+
+    μ = zeros(2)
+    for cell in model
+        jacOT = Flux.jacobian(cell, origin)[1]
+    
+        # get phase advance
+        trMX = jacOT[1,1] + jacOT[2,2]
+        trMY = jacOT[3,3] + jacOT[4,4]
+
+        μ .+= [acos(1/2 * trMX), acos(1/2 * trMY)]
+    end
+
+    return μ ./ (2*π)
+end
+
 end  # module Tools
