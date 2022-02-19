@@ -1,6 +1,7 @@
 module Tools
 
 using Statistics
+import LinearAlgebra as LA
 import Flux
 import FFTW
 import EasyFit
@@ -113,6 +114,97 @@ function getTunes_jacobian(model)
     end
 
     return μ ./ (2*π)
+end
+
+"""
+    function twiss(model)::Dict{Symbol, Any}
+
+Calculate tunes, phase advances and twiss parameters in case no coupling is present.
+"""
+function twiss(model)::Dict{Symbol, Any}
+    # linearize transport maps 
+    jacs = []; elementCount::Int = 0
+
+    for cell in model
+        for element in cell
+            push!(jacs, Flux.jacobian(element, [0.,0.,0.,0.,0.,0.,1.])[1])
+            elementCount += 1
+        end
+    end
+
+    # linear one-turn map
+    jac::Matrix{Float64} = Matrix(1.0LA.I, 7, 7)
+    for i in jacs
+        jac = i * jac
+    end
+
+    # is coupling present?
+    if LA.norm(jac[1:2,3:4]) + LA.norm(jac[3:4,1:2]) != 0
+        println("coupling present")
+        throw(ArgumentError("coupling present"))
+    end
+
+    # does a periodic solution exist?
+    cosXμ = 1/2 * LA.tr(jac[1:2,1:2])
+    if abs(cosXμ) > 1
+        throw(DomainError(cosXμ, "horizontal cosine(phaseAdvance) out of bounds"))
+    end
+
+    cosYμ = 1/2 * LA.tr(jac[3:4,3:4])
+    if abs(cosYμ) > 1
+        throw(DomainError(cosYμ, "vertical cosine(phaseAdvance) out of bounds"))
+    end
+
+    # initial twiss values from one-turn map
+    βX = Array{Float64}(undef, elementCount+1); αX = Array{Float64}(undef, elementCount+1)
+    sinXμ = sign(jac[1,2]) * sqrt(1 - cosXμ^2)
+    βX[1] = jac[1,2] / sinXμ
+    αX[1] = 1/(2 * sinXμ) * (jac[1,1] - jac[2,2])
+
+    βY = Array{Float64}(undef, elementCount+1); αY = Array{Float64}(undef, elementCount+1)
+    sinYμ = sign(jac[3,4]) * sqrt(1 - cosYμ^2)
+    βY[1] = jac[3,4] / sinYμ
+    αY[1] = 1/(2 * sinYμ) * (jac[3,3] - jac[4,4])
+    
+    # propagate twiss along the beamline
+    twissTransportX = Array{Float64}(undef, 3, 3, elementCount)
+    for (i, m) in enumerate(jacs)
+        c = m[1,1]; cp = m[2,1]; s = m[1,2]; sp = m[2,2]
+        twissTransportX[:,:,i] = [c^2 -2*s*c s^2; -1*c*cp s*cp+sp*c -1*s*sp; cp^2 -2*sp*cp sp^2]
+    end
+
+    twiss = [βX[1], αX[1], (1 + αX[1]^2)/βX[1]]
+    for i in 1:elementCount
+        twiss = twissTransportX[:,:,i] * twiss
+        βX[i+1] = twiss[1]
+        αX[i+1] = twiss[2]
+    end
+
+    twissTransportY = Array{Float64}(undef, 3, 3, elementCount)
+    for (i, m) in enumerate(jacs)
+        c = m[3,3]; cp = m[4,3]; s = m[3,4]; sp = m[4,4]
+        twissTransportY[:,:,i] = [c^2 -2*s*c s^2; -1*c*cp s*cp+sp*c -1*s*sp; cp^2 -2*sp*cp sp^2]
+    end
+
+    twiss = [βY[1], αY[1], (1 + αY[1]^2)/βY[1]]
+    for i in 1:elementCount
+        twiss = twissTransportY[:,:,i] * twiss
+        βY[i+1] = twiss[1]
+        αY[i+1] = twiss[2]
+    end
+    
+    # calculate phase advance
+    μX = Array{Float64}(undef, elementCount)
+    for i in 1:elementCount
+        μX[i] = asin(jacs[i][1,2] / sqrt(βX[i] * βX[i+1]))
+    end
+
+    μY = Array{Float64}(undef, elementCount)
+    for i in 1:elementCount
+        μY[i] = asin(jacs[i][3,4] / sqrt(βY[i] * βY[i+1]))
+    end
+    
+    return Dict(:q1=>sum(μX) / (2*π), :q2=>sum(μY) / (2*π), :βX=>βX, :αX=>αX, :βY=>βY, :αY=>αY, :μX=>μX, :μY=>μY)
 end
 
 end  # module Tools
