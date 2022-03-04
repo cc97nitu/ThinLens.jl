@@ -32,6 +32,18 @@ function track(model::Flux.Chain, batch::DenseArray)::PermutedDimsArray
     return PermutedDimsArray(out, (1,3,2))  # dim, BPM, particle
 end
 
+# not differentiable :(
+function track(model::Flux.Chain, batch::DenseArray, turns::Int)::Array{Float64}
+    coordinateBuffer = Array{Float64}(undef, 7, turns*length(model), size(batch)[2])  # dim, BPM, particle
+    println(size(coordinateBuffer))
+    for turn in 1:turns
+        out = reduce(hcat, Flux.activations(model, batch))
+        out = reshape(out, 7, :, length(model))  # dim, particle, BPM
+        coordinateBuffer[:, 1 + (turn - 1)*length(model):turn*length(model), :] = PermutedDimsArray(out, (1,3,2))  # dim, BPM, particle
+    end
+    return coordinateBuffer
+end
+
 precompile(track, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{Drift, BendingMagnet, Drift, BendingMagnet, Drift, Sextupole, Drift, Quadrupole, Drift, Quadrupole, Drift, Sextupole, Drift, Drift, Drift}}}}, Vector{Float64}))
 precompile(track, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{Drift, BendingMagnet, Drift, BendingMagnet, Drift, Sextupole, Drift, Quadrupole, Drift, Quadrupole, Drift, Sextupole, Drift, Drift, Drift}}}}, Matrix{Float64}))
 

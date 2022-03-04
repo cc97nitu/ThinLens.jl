@@ -37,6 +37,19 @@ function Beam(;energy::Number, mass::Number, charge::Number, ϵx::Number, ϵy::N
 end
 
 """
+    setVelocityRatio!(particles::DenseArray{Float64}, beam::Beam)
+
+Adapt velocity ratio β0/β according to beam properties.
+"""
+function setVelocityRatio!(particles::DenseArray{Float64}, beam::Beam)
+    p = beam.p .* (1. .+ particles[6,:])  # GeV/c
+    E = sqrt.(p.^2 .+ beam.mass^2)  # GeV
+    γ = E ./ beam.mass
+    β = p ./ (γ .* beam.mass)
+    particles[7,:] .= beam.beta ./ β
+end
+
+"""
     ParticlesGaussian(beam::Beam, size::Integer; cutoff::Number=3., twiss::Vector{Float64}=[1., 0., 1., 0.])
 
 Sample particles for beam from (transversally) truncated normal distribution.
@@ -85,11 +98,8 @@ function ParticlesGaussian(beam::Beam, size::Integer; cutoff::Number=3., twiss::
     end
     
     # adapt velocity ratio β0/β
-    p = beam.p .* (1. .+ particles[6,:])  # GeV/c
-    E = sqrt.(p.^2 .+ beam.mass^2)  # GeV
-    γ = E ./ beam.mass
-    β = p ./ (γ .* beam.mass)
-    particles[7,:] .= beam.beta ./ β
+    setVelocityRatio!(particles, beam)
     
     return particles
 end
+
