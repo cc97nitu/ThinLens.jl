@@ -82,20 +82,22 @@ function ParticlesGaussian(beam::Beam, size::Integer; cutoff::Number=3., twiss::
     if beam.sigt == 0.
         particles[5,:] = zeros(size)
     else
-        longDist = Distributions.TruncatedNormal(beam.centroid[5], beam.sigt, -1*cutoff*beam.sigt, cutoff*beam.sigt)
+        longDist = Distributions.TruncatedNormal(0., beam.sigt, -1*cutoff*beam.sigt, cutoff*beam.sigt)
         long = Array{Float64}(undef, size)
         Distributions.rand!(longDist, long)
         particles[5,:] .= long
     end
+    particles[5,:] .+= beam.centroid[5]
 
     if beam.sige == 0.
         particles[6,:] = zeros(size)
     else
-        δDist = Distributions.TruncatedNormal(beam.centroid[6], beam.sige*beam.beta, -1*cutoff*beam.sige*beam.beta, cutoff*beam.sige*beam.beta)
+        δDist = Distributions.TruncatedNormal(0., beam.sige*beam.beta, -1*cutoff*beam.sige*beam.beta, cutoff*beam.sige*beam.beta)
         δ = Array{Float64}(undef, size)
         Distributions.rand!(δDist, δ)
         particles[6,:] .= δ
     end
+    particles[6,:] .+= beam.centroid[6]
     
     # adapt velocity ratio β0/β
     setVelocityRatio!(particles, beam)
