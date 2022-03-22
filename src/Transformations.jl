@@ -3,7 +3,7 @@
 
 Apply linear drift to particle coordinates.
 """
-function driftLinear(p::DenseArray{Float64}, len::Float64)
+function driftLinear(p::AbstractVecOrMat, len::Float64)
     pnew = copy(p)
       
     pnew[1,:] .+= len .* p[2,:]
@@ -12,7 +12,7 @@ function driftLinear(p::DenseArray{Float64}, len::Float64)
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(driftLinear), pold::DenseArray{Float64}, len::Float64)
+function ChainRulesCore.rrule(::typeof(driftLinear), pold::AbstractVecOrMat, len::Float64)
     p = driftLinear(pold, len)
     function driftLinear_pullback(Δ)
         newΔ = copy(Δ)
@@ -30,7 +30,7 @@ end
 
 Apply analytic drift to particle coordinates.
 """
-function driftExact(p::DenseArray{Float64}, len::Float64)
+function driftExact(p::AbstractVecOrMat, len::Float64)
     pnew = copy(p)
     px = p[2, :]; py = p[4, :]; δ = p[6, :]; vR = p[7, :]
     
@@ -43,7 +43,7 @@ function driftExact(p::DenseArray{Float64}, len::Float64)
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(driftExact), pold::DenseArray{Float64}, len::Float64)
+function ChainRulesCore.rrule(::typeof(driftExact), pold::AbstractVecOrMat, len::Float64)
     p = driftExact(pold, len)
     function driftExact_pullback(Δ)
         newΔ = copy(Δ)
@@ -71,7 +71,7 @@ end
 
 Kick particles due to dipole edge effects.
 """
-function dipoleEdge(p::DenseArray{Float64}, len::Float64, α::Float64, ϵ::Float64, hgap::Float64, fint::Float64)
+function dipoleEdge(p::AbstractVecOrMat, len::Float64, α::Float64, ϵ::Float64, hgap::Float64, fint::Float64)
     pnew = copy(p)
     corr = 2 * α/len * hgap * fint
     
@@ -81,7 +81,7 @@ function dipoleEdge(p::DenseArray{Float64}, len::Float64, α::Float64, ϵ::Float
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::DenseArray{Float64}, len::Float64, α::Float64, ϵ::Float64, hgap::Float64, fint::Float64)
+function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::AbstractVecOrMat, len::Float64, α::Float64, ϵ::Float64, hgap::Float64, fint::Float64)
     pnew = dipoleEdge(pold, len, α, ϵ, hgap, fint)
     
     function dipoleEdge_pullback(Δ)
@@ -97,7 +97,7 @@ function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::DenseArray{Float64}, l
     return pnew, dipoleEdge_pullback
 end
 
-function dipoleEdge(p::DenseArray{Float64}, len::Float64, α::Float64, ϵ::Float64)
+function dipoleEdge(p::AbstractVecOrMat, len::Float64, α::Float64, ϵ::Float64)
     pnew = copy(p)
     
     pnew[2,:] .+= p[1,:] .* α./len .* tan(ϵ)
@@ -106,7 +106,7 @@ function dipoleEdge(p::DenseArray{Float64}, len::Float64, α::Float64, ϵ::Float
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::DenseArray{Float64}, len::Float64, α::Float64, ϵ::Float64)
+function ChainRulesCore.rrule(::typeof(dipoleEdge), pold::AbstractVecOrMat, len::Float64, α::Float64, ϵ::Float64)
     pnew = dipoleEdge(pold, len, α, ϵ)
     
     function dipoleEdge_pullback(Δ)
@@ -127,7 +127,7 @@ end
 
 Update particle momentum in transversal magnetic field up to arbitrary order.
 """
-function thinMultipole(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64})
+function thinMultipole(p::AbstractVecOrMat, len::Float64, kn::Vector{Float64}, ks::Vector{Float64})
     pnew = copy(p)
 
     dpx = kn[end]
@@ -148,7 +148,7 @@ function thinMultipole(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(thinMultipole), pold::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64})
+function ChainRulesCore.rrule(::typeof(thinMultipole), pold::AbstractVecOrMat, len::Float64, kn::Vector{Float64}, ks::Vector{Float64})
     pnew = thinMultipole(pold, len, kn, ks)
     
     function thinMultipole_pullback(Δ)
@@ -213,7 +213,7 @@ function ChainRulesCore.rrule(::typeof(thinMultipole), pold::DenseArray{Float64}
     return pnew, thinMultipole_pullback
 end
 
-function thinMultipole(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64)
+function thinMultipole(p::AbstractVecOrMat, len::Float64, kn::AbstractVector, ks::AbstractVector, hx::Float64, hy::Float64)
     pnew = copy(p)
 
     dpx = kn[end]
@@ -239,7 +239,7 @@ function thinMultipole(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}
         hyy = 0.
     end
 
-    dpx .= len .* (-dpx .+ hx .+ hx .* p[6,:] .- kn[1,:] .* hxx)
+    dpx .= len .* (-1. .* dpx .+ hx .+ hx .* p[6,:] .- kn[1,:] .* hxx)
     dpy .= len .* (dpy .- hy .- hy .* p[6,:] .+ ks[1,:] .* hyy)
 
     dσ = (hyly .- hxlx) .* p[7,:]
@@ -252,7 +252,7 @@ function thinMultipole(p::DenseArray{Float64}, len::Float64, kn::Vector{Float64}
     return pnew
 end
 
-function ChainRulesCore.rrule(::typeof(thinMultipole), pold::DenseArray{Float64}, len::Float64, kn::Vector{Float64}, ks::Vector{Float64}, hx::Float64, hy::Float64)
+function ChainRulesCore.rrule(::typeof(thinMultipole), pold::AbstractVecOrMat, len::Float64, kn::AbstractVector, ks::AbstractVector, hx::Float64, hy::Float64)
     pnew = thinMultipole(pold, len, kn, ks, hx, hy)
     
     function thinMultipole_pullback(Δ)

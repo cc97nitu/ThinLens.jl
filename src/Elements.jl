@@ -7,7 +7,7 @@ mutable struct Drift <: BeamlineElement
     len::Float64
 end
 
-function (e::Drift)(p::T) where {T<:AbstractArray{Float64}}
+function (e::Drift)(p::AbstractVecOrMat)
     driftExact(p, e.len)
 end
 
@@ -15,7 +15,7 @@ end
 """Element that can be described via transversal magnetic fields."""
 abstract type Magnet <: BeamlineElement end
 
-function (e::Magnet)(p::T) where {T<:AbstractArray{Float64}}
+function (e::Magnet)(p::AbstractVecOrMat)
     stepLength = e.len / e.steps
     for _ in 1:e.steps        
         for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
@@ -84,10 +84,10 @@ end
 Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], split, steps)
 
 """Bending magnet."""
-mutable struct BendingMagnet <: Magnet
+mutable struct BendingMagnet{T<:AbstractVector} <: Magnet
     len::Float64
-    kn::Vector{Float64}
-    ks::Vector{Float64}
+    kn::T
+    ks::T
     α::Float64  # horizontal deflection angle ref. trajectory
     β::Float64  # vertical deflection angle ref. trajectory
     ϵ1::Float64
@@ -100,7 +100,7 @@ SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=split
 
 RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(len, [α / len, 0., 0.], [0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, split, steps)
 
-function (e::BendingMagnet)(p::T) where {T<:AbstractArray{Float64}}
+function (e::BendingMagnet)(p::AbstractVecOrMat)
     # entry pole face
     p = dipoleEdge(p, e.len, e.α, e.ϵ1)
 
