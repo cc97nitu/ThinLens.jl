@@ -41,7 +41,6 @@ function track(model::Flux.Chain, batch::DenseArray, turns::Int)::Array{Float64}
     out = reshape(out, 7, :, length(model))  # dim, particle, BPM
     coordinateBuffer[:, 1:length(model) , :] = PermutedDimsArray(out, (1,3,2))  # dim, BPM, particle
 
-    println(size(coordinateBuffer))
     for turn in 2:turns
         out = reduce(hcat, Flux.activations(model, coordinateBuffer[:,(turn - 1)*length(model),:]))
         out = reshape(out, 7, :, length(model))  # dim, particle, BPM
