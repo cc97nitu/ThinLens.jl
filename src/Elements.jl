@@ -70,7 +70,7 @@ mutable struct Quadrupole <: Magnet
     steps::Int
 end
 
-Quadrupole(len::Number, k1n::Number, k1s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Quadrupole(len, [0., k1n, 0.], [0., k1s, 0.], split, steps)
+Quadrupole(len::Number, k1n::Number, k1s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Quadrupole(len, [0., k1n, 0., 0.], [0., k1s, 0., 0.], split, steps)
 
 """Sextupole."""
 mutable struct Sextupole <: Magnet
@@ -81,7 +81,7 @@ mutable struct Sextupole <: Magnet
     steps::Int
 end
 
-Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Sextupole(len, [0., 0., k2n], [0., 0., k2s], split, steps)
+Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Sextupole(len, [0., 0., k2n, 0.], [0., 0., k2s, 0.], split, steps)
 
 """Bending magnet."""
 mutable struct BendingMagnet{T<:AbstractVector} <: Magnet

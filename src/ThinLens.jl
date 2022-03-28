@@ -17,10 +17,10 @@ include("Beamlines.jl")
 include("Lattice.jl")
 include("Tools.jl")
 
-Flux.@functor Drift
+# Flux.@functor Drift
 Flux.@functor Quadrupole
 Flux.@functor Sextupole
-Flux.@functor BendingMagnet
+# Flux.@functor BendingMagnet
 # Flux.@functor RBen
 # Flux.@functor SBen
 
