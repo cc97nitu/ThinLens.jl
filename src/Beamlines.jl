@@ -85,3 +85,18 @@ function assignMasks(model::Flux.Chain;
 
     return masks
 end
+
+macro track(turns)
+    results = [Symbol("z", i) for i in 1:turns]
+    
+    body = Expr(:block)
+    push!(body.args, :($(results[1]) = track(model, particles)))
+
+    for i in 2:length(results)
+        push!(body.args, :($(results[i]) = track(model, $(results[i-1])[:,end,:])))
+    end
+    push!(body.args, :(cat($(results...), dims=2)))
+    
+    head = :(track_long(model::Flux.Chain, particles::AbstractVecOrMat))
+    return Expr(:function, head, body)
+end
