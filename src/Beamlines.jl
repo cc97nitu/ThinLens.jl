@@ -26,14 +26,14 @@ end
 
 Track particles through model and collect phasespace after each layer.
 """
-function track(model::Flux.Chain, batch::DenseArray)::PermutedDimsArray
+function track(model::Flux.Chain, batch::AbstractVecOrMat)::PermutedDimsArray
     out = reduce(hcat, Flux.activations(model, batch))
     out = reshape(out, 7, :, length(model))  # dim, particle, BPM
     return PermutedDimsArray(out, (1,3,2))  # dim, BPM, particle
 end
 
 # not differentiable :(
-function track(model::Flux.Chain, batch::DenseArray, turns::Int)::Array{Float64}
+function track(model::Flux.Chain, batch::AbstractVecOrMat, turns::Int)::Array{Float64}
     coordinateBuffer = Array{Float64}(undef, 7, turns*length(model), size(batch)[2])  # dim, BPM, particle
 
     # first turn
@@ -58,7 +58,7 @@ precompile(track, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{Drift, BendingMagnet, 
 Return dict which maps kn to their corresponding mask.
 """
 function assignMasks(model::Flux.Chain;
-    nested::Bool=true, quadMask::Union{Vector{Float64}, Nothing}=nothing, sextMask::Union{Vector{Float64}, Nothing}=nothing
+    nested::Bool=true, quadMask::Union{Vector{Float64}, Nothing}=nothing, sextMask::Union{Vector{Float64}, Nothing}=nothing, bendMask::Union{Vector{Float64}, Nothing}=nothing
     )::IdDict{Vector{Float64}, Vector{Float64}}
 
     masks = IdDict{Vector{Float64}, Vector{Float64}}()
@@ -70,6 +70,8 @@ function assignMasks(model::Flux.Chain;
                     masks[element.kn] = quadMask
                 elseif typeof(element) == Sextupole && !isnothing(sextMask)
                     masks[element.kn] = sextMask
+                elseif typeof(element) == BendingMagnet && !isnothing(bendMask)
+                    masks[element.kn] = bendMask
                 end
             end
         end
@@ -79,6 +81,8 @@ function assignMasks(model::Flux.Chain;
                 masks[element.kn] = quadMask
             elseif typeof(element) == Sextupole && !isnothing(sextMask)
                 masks[element.kn] = sextMask
+            elseif typeof(element) == BendingMagnet && !isnothing(bendMask)
+                masks[element.kn] = bendMask
             end
         end
     end
