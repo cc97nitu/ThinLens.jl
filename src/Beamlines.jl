@@ -90,14 +90,30 @@ function assignMasks(model::Flux.Chain;
     return masks
 end
 
+macro track_oneTurn(noCells)
+    results = [Symbol("z", i) for i in 1:noCells]
+    
+    body = Expr(:block)
+    push!(body.args, :($(results[1]) = model[1](particles)))
+
+    for i in 2:length(results)
+        push!(body.args, :($(results[i]) = model[$i]( $(results[i-1]) )))
+    end
+    push!(body.args, :(out = cat($(results...), dims=3)))
+    push!(body.args, :(PermutedDimsArray(out, (1,3,2))))
+    
+    head = :(track_oneTurn(model::Flux.Chain, particles::AbstractVecOrMat)::AbstractArray)
+    return Expr(:function, head, body)
+end
+
 macro track(turns)
     results = [Symbol("z", i) for i in 1:turns]
     
     body = Expr(:block)
-    push!(body.args, :($(results[1]) = track(model, particles)))
+    push!(body.args, :($(results[1]) = track_oneTurn(model, particles)))
 
     for i in 2:length(results)
-        push!(body.args, :($(results[i]) = track(model, $(results[i-1])[:,end,:])))
+        push!(body.args, :($(results[i]) = track_oneTurn(model, $(results[i-1])[:,end,:])))
     end
     push!(body.args, :(cat($(results...), dims=2)))
     
