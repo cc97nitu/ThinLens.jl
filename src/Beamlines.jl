@@ -100,7 +100,7 @@ macro track_oneTurn(noCells)
         push!(body.args, :($(results[i]) = model[$i]( $(results[i-1]) )))
     end
     push!(body.args, :(out = cat($(results...), dims=3)))
-    push!(body.args, :(PermutedDimsArray(out, (1,3,2))))
+    push!(body.args, :(permutedims(out, (1,3,2))))
     
     head = :(track_oneTurn(model::Flux.Chain, particles::AbstractVecOrMat)::AbstractArray)
     return Expr(:function, head, body)
