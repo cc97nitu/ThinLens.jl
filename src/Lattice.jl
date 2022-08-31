@@ -48,6 +48,40 @@ function SIS18_Lattice_minimal(k1f::Float64, k1d::Float64; nested::Bool=true, ce
 end
 
 
+function SIS18_Cell_FODO(k1f::Float64, k1d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
+    d1 = ThinLens.Drift(0.645 + 0.9700000000000002 + 2*2.617993878 + 6.839011704000001)
+    d4 = ThinLens.Drift(0.5999999999999979)
+    d5 = ThinLens.Drift(0.7097999999999978 + 0.4804 + 0.49979999100000283)
+
+    qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split, steps=steps)
+    qs2d = ThinLens.Quadrupole(1.04, k1d, 0; split=split, steps=steps)
+
+    # set up beam line
+    Flux.Chain(d1, qs1f, d4, qs2d, d5)
+end
+
+
+function SIS18_Lattice_FODO(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
+    nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
+
+    if nested
+        if cellsIdentical
+            cell = SIS18_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps)
+            return ThinLens.NestedChain([cell for _ in 1:12])
+        else
+            return ThinLens.NestedChain([SIS18_Cell_FODO(k1f, k1d; split=split, steps=steps) for _ in 1:12])
+        end
+    else
+        if cellsIdentical
+            cell = SIS18_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps)
+            return ThinLens.FlatChain([cell for _ in 1:12])
+        else
+            return ThinLens.FlatChain([SIS18_Cell_FODO(k1f, k1d; split=split, steps=steps) for _ in 1:12])
+        end
+    end
+end
+
+
 function SIS18_Cell(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     # bending magnets
     bendingAngle = 0.2617993878
@@ -155,14 +189,14 @@ function SPS_Lattice(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
             cell = SPS_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles)
             return ThinLens.NestedChain([cell for _ in 1:104])
         else
-            return ThinLens.NestedChain([SPS_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps) for _ in 1:104])
+            return ThinLens.NestedChain([SPS_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles) for _ in 1:104])
         end
     else
         if cellsIdentical
             cell = SPS_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles)
             return ThinLens.FlatChain([cell for _ in 1:104])
         else
-            return ThinLens.FlatChain([SPS_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps) for _ in 1:104])
+            return ThinLens.FlatChain([SPS_Cell(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles) for _ in 1:104])
         end
     end
 end
