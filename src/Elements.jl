@@ -7,29 +7,34 @@ mutable struct Drift <: BeamlineElement
     len::Float64
 end
 
-function (e::Drift)(p::AbstractVecOrMat)
-    driftExact(p, e.len)
+function (e::Drift)(particles::AbstractVecOrMat)
+    p = [particles[i,:] for i in 1:size(particles,1)]
+
+    p = driftExact(p..., e.len)
+    return vcat(transpose.(p)...)
 end
 
 
 """Element that can be described via transversal magnetic fields."""
 abstract type Magnet <: BeamlineElement end
 
-function (e::Magnet)(p::AbstractVecOrMat)
+function (e::Magnet)(particles::AbstractVecOrMat)
+    p = [particles[i,:] for i in 1:size(particles,1)]
+    
     stepLength = e.len / e.steps
     for _ in 1:e.steps        
         for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
             # drift
-            p = driftExact(p, c * stepLength)
+            p = driftExact(p..., c * stepLength)
         
             # kick
             if d != 0
-                p = thinMultipole(p, d * stepLength, e.kn, e.ks)
+                p = thinMultipole(p..., d * stepLength, e.kn, e.ks)
             end
         end
     end
 
-    return p
+    return vcat(transpose.(p)...)
 end
 
 """
@@ -100,25 +105,27 @@ SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=split
 
 RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, split, steps)
 
-function (e::BendingMagnet)(p::AbstractVecOrMat)
+function (e::BendingMagnet)(particles::AbstractVecOrMat)
+    p = [particles[i,:] for i in 1:size(particles,1)]
+    
     # entry pole face
-    p = dipoleEdge(p, e.len, e.α, e.ϵ1)
+    p = dipoleEdge(p..., e.len, e.α, e.ϵ1)
 
     stepLength = e.len / e.steps
     for _ in 1:e.steps
         for (c, d) in zip(e.splitScheme.c, e.splitScheme.d)
             # drift
-            p = driftExact(p, c * stepLength)
+            p = driftExact(p..., c * stepLength)
         
             # kick
             if d != 0
-                p = thinMultipole(p, d * stepLength, e.kn, e.ks, e.α/e.len, e.β/e.len)
+                p = thinMultipole(p..., d * stepLength, e.kn, e.ks, e.α/e.len, e.β/e.len)
             end
         end
     end
 
     # exit pole face
-    p = dipoleEdge(p, e.len, e.α, e.ϵ2)
+    p = dipoleEdge(p..., e.len, e.α, e.ϵ2)
     
-    return p
+    return vcat(transpose.(p)...)
 end
