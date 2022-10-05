@@ -207,4 +207,47 @@ function twiss(model)::Dict{Symbol, Any}
     return Dict(:q1=>sum(μX) / (2*π), :q2=>sum(μY) / (2*π), :βX=>βX, :αX=>αX, :βY=>βY, :αY=>αY, :μX=>μX, :μY=>μY)
 end
 
+""""
+    ellipse(x::Real, px::Real, a::Real, b::Real, θ::Real)
+
+Compute x,y points of ellipse with semi-axes a,b centered around (x, px).
+"""
+function ellipse(x::Real, px::Real, a::Real, b::Real, θ::Real)
+    ψ = LinRange(0, 2π, 500)
+    ar = a .* sin.(ψ)
+    br = b .* cos.(ψ)
+    return x .+ cos(θ) .* ar .- sin(θ) .* br, px .+ sin(θ) .* ar .+ cos(θ) .* br
+end 
+
+"""
+    twissEllipse(β::Real, α::Real, ϵ::Real; x0=0., px0=0.)
+
+Compute x,y points of twiss ellipse centered around (x0, px0).
+"""
+function twissEllipse(β::Real, α::Real, ϵ::Real; x0=0., px0=0.)
+    γ = (1+α^2)/β
+    beamMatrix = ϵ * [β -α; -α γ]
+
+    eigenval, eigenvectors = LA.eigen(beamMatrix)
+    a = sqrt(eigenval[1])
+    b = sqrt(eigenval[2])
+    rotAngle = atan(eigenvectors[2,1], eigenvectors[1,1])
+
+    return ellipse(x0, px0, a, b, rotAngle)
+end
+
+"""
+    twissEllipse(σ::AbstractMatrix; x0=0., px0=0.)
+
+Compute x,y points of twiss ellipse centered around (x0, px0) from beam matrix σ.
+"""
+function twissEllipse(σ::AbstractMatrix; x0=0., px0=0.)
+    eigenval, eigenvectors = LA.eigen(σ)
+    a = sqrt(eigenval[1])
+    b = sqrt(eigenval[2])
+    rotAngle = atan(eigenvectors[2,1], eigenvectors[1,1])
+
+    return ellipse(x0, px0, a, b, rotAngle)
+end
+
 end  # module Tools

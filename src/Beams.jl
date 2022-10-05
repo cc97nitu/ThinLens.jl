@@ -61,8 +61,8 @@ function ParticlesGaussian(beam::Beam, size::Integer; cutoff::Number=3., twiss::
     
     # sample transverse coordinates
     angleDist = Distributions.Uniform(0, 2π)
-    horActionDist = Distributions.TruncatedNormal(0, beam.ϵx, 0, cutoff*beam.ϵx)
-    verActionDist = Distributions.TruncatedNormal(0, beam.ϵy, 0, cutoff*beam.ϵy)
+    horActionDist = Distributions.TruncatedNormal(0, beam.ϵx / 2., 0, cutoff*beam.ϵx / 2.)
+    verActionDist = Distributions.TruncatedNormal(0, beam.ϵy / 2., 0, cutoff*beam.ϵy / 2.)
 
     horPhase = Array{Float64}(undef, size); horAction = Array{Float64}(undef, size)
     Distributions.rand!(angleDist, horPhase)
