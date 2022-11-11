@@ -6,6 +6,22 @@ module Lattice
 import Flux
 import ThinLens
 
+
+function FODO(k1f::Float64, k1d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
+    # d1 = ThinLens.Drift(1.)
+    # d2 = ThinLens.Drift(1.)
+    # d3 = ThinLens.Drift(1.)
+
+    qs1f = ThinLens.Quadrupole(1., k1f, 0; split=split, steps=steps)
+    qs2d = ThinLens.Quadrupole(1., k1d, 0; split=split, steps=steps)
+
+    # set up beam line
+    # Flux.Chain(d1, qs1f, d2, qs2d, d3)
+    Flux.Chain(qs1f, qs2d)
+
+end
+
+
 function SIS18_Cell_minimal(k1f::Float64, k1d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     bendingAngle = 0.2617993878
     rb1 = ThinLens.RBen(2.617993878, bendingAngle, 0, 0; split=split, steps=steps)
