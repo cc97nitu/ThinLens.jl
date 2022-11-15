@@ -123,7 +123,7 @@ end
 Update particle momentum in transversal magnetic field up to arbitrary order.
 """
 function thinMultipole(x::T, px::T, y::T, py::T, σ::T, δ::T, β0β::T,
-        len::AbstractFloat, kn::AbstractVector, ks::AbstractVector) where T<:AbstractVector
+        len::AbstractFloat, kn::S, ks::S) where {S<:AbstractVector,T<:AbstractVector}
     dpx = kn[end]
     dpy = ks[end]
 
@@ -144,7 +144,7 @@ end
 
 function ChainRulesCore.rrule(::typeof(thinMultipole),
         x::T, px::T, y::T, py::T, σ::T, δ::T, β0β::T,
-        len::AbstractFloat, kn::T, ks::T) where T<:AbstractVector
+        len::AbstractFloat, kn::S, ks::S) where {S<:AbstractVector,T<:AbstractVector}
     pnew = thinMultipole(x, px, y, py, σ, δ, β0β, len, kn, ks)
 
     function thinMultipole_pullback(Δ)
@@ -207,7 +207,7 @@ function ChainRulesCore.rrule(::typeof(thinMultipole),
 end
 
 function thinMultipole(x::T, px::T, y::T, py::T, σ::T, δ::T, β0β::T,
-        len::AbstractFloat, kn::T, ks::T, hx::AbstractFloat, hy::AbstractFloat) where T<:AbstractVector
+        len::AbstractFloat, kn::S, ks::S, hx::AbstractFloat, hy::AbstractFloat) where {S<:AbstractVector,T<:AbstractVector}
     dpx = kn[end]
     dpy = ks[end]
 
@@ -245,7 +245,7 @@ function thinMultipole(x::T, px::T, y::T, py::T, σ::T, δ::T, β0β::T,
 end
 
 function ChainRulesCore.rrule(::typeof(thinMultipole), x::T, px::T, y::T, py::T, σ::T, δ::T, β0β::T,
-        len::AbstractFloat, kn::T, ks::T, hx::AbstractFloat, hy::AbstractFloat) where T<:AbstractVector
+        len::AbstractFloat, kn::S, ks::S, hx::AbstractFloat, hy::AbstractFloat) where {S<:AbstractVector,T<:AbstractVector}
     pnew = thinMultipole(x, px, y, py, σ, δ, β0β, len, kn, ks, hx, hy)
 
     function thinMultipole_pullback(Δ)
