@@ -69,8 +69,8 @@ end
 """Quadrupole."""
 mutable struct Quadrupole <: Magnet
     len::Float64
-    kn::Vector{Float64}
-    ks::Vector{Float64}
+    kn::AbstractVector
+    ks::AbstractVector
     splitScheme::SplitScheme
     steps::Int
 end
@@ -80,8 +80,8 @@ Quadrupole(len::Number, k1n::Number, k1s::Number; split::SplitScheme=splitO2nd, 
 """Sextupole."""
 mutable struct Sextupole <: Magnet
     len::Float64
-    kn::Vector{Float64}
-    ks::Vector{Float64}
+    kn::AbstractVector
+    ks::AbstractVector
     splitScheme::SplitScheme
     steps::Int
 end
@@ -91,8 +91,8 @@ Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, s
 """Bending magnet."""
 mutable struct BendingMagnet <: Magnet
     len::Float64
-    kn::Vector{Float64}
-    ks::Vector{Float64}
+    kn::AbstractVector
+    ks::AbstractVector
     α::Float64  # horizontal deflection angle ref. trajectory
     β::Float64  # vertical deflection angle ref. trajectory
     ϵ1::Float64
