@@ -16,6 +16,9 @@ include("Transformations.jl")
 include("Elements.jl")
 include("Beamlines.jl")
 
+# thick tracking
+include("ThickTrack.jl")
+
 # convenience methods
 include("Lattice.jl")
 include("Tools.jl")
