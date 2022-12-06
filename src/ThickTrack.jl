@@ -1,6 +1,6 @@
 import Flux
 import TaylorSeries as TS
-
+import LinearAlgebra as LA
 
 """
 Buggy!!!!!!!!
@@ -99,23 +99,39 @@ function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20)
 end
 
 
-function propagate(element::Drift, z)
-    if TS.get_numvars() == 6
-        return [TS.evaluate(element.thickMap[i], z) for i in 1:length(element.thickMap)]
-    else
-        kn = zeros(4)
-        ks = zeros(4)
+"""
+    propagate(map, z, kn, ks)
+    function propagate(element::T, z) where T<:Drift
+    function propagate(element::T, z) where T<:Magnet
 
-        return [TS.evaluate(element.thickMap[i], vcat(z, kn, ks)) for i in 1:length(element.thickMap)]
+Propagate phase space coordinates z through beamline element.
+"""
+function propagate(map, z, kn, ks)
+    return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
+end
+
+function ChainRulesCore.rrule(::typeof(propagate), map, z, kn, ks)
+    z_final = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z,kn,ks); order=1)
+
+    function propagate_pullback(Δ)                
+        jac = jacobian(z_final)
+        newΔ = LA.transpose(jac) * Δ
+        
+        Δz = newΔ[1:6]
+        Δkn = newΔ[7:10]
+        Δks = newΔ[11:end]
+
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
     end
+    return TS.constant_term(z_final), propagate_pullback
+end
+
+function propagate(element::T, z) where T<:Drift
+    propagate(element.thickMap, z, zeros(4), zeros(4))
 end
 
 function propagate(element::T, z) where T<:Magnet
-    if TS.get_numvars() == 6
-        return [TS.evaluate(element.thickMap[i], z) for i in 1:length(element.thickMap)]
-    else
-        return [TS.evaluate(element.thickMap[i], vcat(z, element.kn, element.ks)) for i in 1:length(element.thickMap)]
-    end
+    propagate(element.thickMap, z, element.kn, element.ks)
 end
 
 
@@ -139,6 +155,7 @@ end
 
 """
     plug_in(z::TS.TaylorN{T}, values::Vector{T}, mask_bool::AbstractArray{Bool})::TS.TaylorN{T} where T<:Number
+    plug_in(z::AbstractVector{TS.TaylorN{T}}, values::Vector{T}, mask_bool::AbstractArray{Bool})::AbstractVector{TS.TaylorN{T}} where T<:Number
 
 Replace variables specified by mask_bool with values. Requires length(values) == length(mask_bool) == TS.get_numvars()
 """
@@ -167,4 +184,8 @@ function plug_in(z::TS.TaylorN{T}, values::Vector{T}, mask_bool::AbstractArray{B
     end
     
     return newZ
+end
+
+function plug_in(z::AbstractVector{TS.TaylorN{T}}, values::Vector{T}, mask_bool::AbstractArray{Bool})::AbstractVector{TS.TaylorN{T}} where T<:Number
+    [plug_in(z[i], values, mask_bool) for i in eachindex(z)]
 end
