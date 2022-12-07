@@ -106,11 +106,11 @@ end
 
 Propagate phase space coordinates z through beamline element.
 """
-function propagate(map, z, kn, ks)
+function propagate(map, z::T, kn::T, ks::T)::T where T<:AbstractVector
     return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, z, kn, ks)
+function ChainRulesCore.rrule(::typeof(propagate), map, z::T, kn::T, ks::T) where T<:AbstractVector
     z_final = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z,kn,ks); order=1)
 
     function propagate_pullback(Δ)                
@@ -126,12 +126,52 @@ function ChainRulesCore.rrule(::typeof(propagate), map, z, kn, ks)
     return TS.constant_term(z_final), propagate_pullback
 end
 
-function propagate(element::T, z) where T<:Drift
+function propagate(map, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
+    out = similar(z)
+    for i in 1:size(z)[2]
+        out[:,i] .= propagate(map, z[:,i], kn, ks)
+    end
+    return out
+end
+
+function ChainRulesCore.rrule(::typeof(propagate), map, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
+    z_final = Array{typeof(map)}(undef, size(z)[2])
+
+    for i in eachindex(z_final)
+        z_final[i] = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z[:,i],kn,ks); order=1)
+    end
+    
+    function propagate_pullback(Δ)
+        jacs = jacobian.(z_final)
+        
+        newΔ = Array{eltype(Δ)}(undef, size(jacs[1])[2], size(Δ)[2])
+        for i in 1:size(Δ)[2]
+            newΔ[:,i] .= LA.transpose(jacs[i]) * Δ[:,i]
+        end
+        
+        Δz = newΔ[1:6,:]
+        Δkn = newΔ[7:10,:]
+        Δks = newΔ[11:end,:]
+        
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, sum(Δkn, dims=2), sum(Δks, dims=2)
+    end
+    return hcat([TS.constant_term(z_final[i]) for i in eachindex(z_final)]...), propagate_pullback
+end
+
+function propagate(element::T, z::S)::S where {T<:Drift,S<:AbstractVecOrMat}
     propagate(element.thickMap, z, zeros(4), zeros(4))
 end
 
-function propagate(element::T, z) where T<:Magnet
+function propagate(element::T, z::S)::S where {T<:Magnet,S<:AbstractVecOrMat}
     propagate(element.thickMap, z, element.kn, element.ks)
+end
+
+function propagate(model::Flux.Chain, z::AbstractVecOrMat)::AbstractVecOrMat
+    for element in model
+        z = propagate(element, z)
+    end
+    
+    return z
 end
 
 
@@ -188,4 +228,37 @@ end
 
 function plug_in(z::AbstractVector{TS.TaylorN{T}}, values::Vector{T}, mask_bool::AbstractArray{Bool})::AbstractVector{TS.TaylorN{T}} where T<:Number
     [plug_in(z[i], values, mask_bool) for i in eachindex(z)]
+end
+
+
+macro thickTrack_oneTurn(noCells)
+    results = [Symbol("z", i) for i in 1:noCells]
+    
+    body = Expr(:block)
+    push!(body.args, :($(results[1]) = propagate(model[1], particles)))
+
+    for i in 2:length(results)
+        push!(body.args, :($(results[i]) = propagate(model[$i], $(results[i-1]) )))
+    end
+    push!(body.args, :(out = cat($(results...), dims=3)))
+    push!(body.args, :(permutedims(out, (1,3,2))))
+    
+    head = :(thickTrack_oneTurn(model::Flux.Chain, particles::AbstractVecOrMat)::AbstractArray)
+    return Expr(:function, head, body)
+end
+
+
+macro thickTrack(turns)
+    results = [Symbol("z", i) for i in 1:turns]
+    
+    body = Expr(:block)
+    push!(body.args, :($(results[1]) = thickTrack_oneTurn(model, particles)))
+
+    for i in 2:length(results)
+        push!(body.args, :($(results[i]) = thickTrack_oneTurn(model, $(results[i-1])[:,end,:])))
+    end
+    push!(body.args, :(cat($(results...), dims=2)))
+    
+    head = :(thickTrack_long(model::Flux.Chain, particles::AbstractVecOrMat)::AbstractArray)
+    return Expr(:function, head, body)
 end
