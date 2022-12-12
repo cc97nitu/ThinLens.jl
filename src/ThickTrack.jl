@@ -94,6 +94,15 @@ function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20)
     for cell in model
         for element in cell
             element.thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+
+            jacobian = Array{eltype(element.thickMap)}(undef, length(element.thickMap), TS.get_numvars())
+            for j in 1:size(jacobian,2)
+                for i in 1:size(jacobian,1)
+                    jacobian[i,j] = TS.derivative(element.thickMap[i], j)
+                end
+            end
+
+            element.thickMap_jacobian = jacobian
         end
     end
 end
@@ -106,64 +115,76 @@ end
 
 Propagate phase space coordinates z through beamline element.
 """
-function propagate(map, z::T, kn::T, ks::T)::T where T<:AbstractVector
+function propagate(map, map_jacobian, z::T, kn::T, ks::T)::T where T<:AbstractVector
     return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, z::T, kn::T, ks::T) where T<:AbstractVector
-    z_final = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z,kn,ks); order=1)
+function ChainRulesCore.rrule(::typeof(propagate), map, map_jacobian, z::T, kn::T, ks::T) where T<:AbstractVector
+    z_final = propagate(map, map_jacobian, z, kn, ks)
 
-    function propagate_pullback(Δ)                
-        jac = jacobian(z_final)
+    function propagate_pullback(Δ)
+        z_ex = vcat(z, kn, ks)            
+        jac = Array{Float64}(undef, size(map_jacobian)...)
+        for j in 1:size(jac,2)
+            for i in 1:size(jac,1)
+                jac[i,j] = TS.evaluate(map_jacobian[i,j], z_ex)
+            end
+        end
+
         newΔ = LA.transpose(jac) * Δ
         
         Δz = newΔ[1:6]
         Δkn = newΔ[7:10]
         Δks = newΔ[11:end]
 
-        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
     end
     return TS.constant_term(z_final), propagate_pullback
 end
 
-function propagate(map, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
+function propagate(map, map_jacobian, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
     out = similar(z)
     for i in 1:size(z)[2]
-        out[:,i] .= propagate(map, z[:,i], kn, ks)
+        out[:,i] .= propagate(map, map_jacobian, z[:,i], kn, ks)
     end
     return out
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
-    z_final = Array{typeof(map)}(undef, size(z)[2])
-
-    for i in eachindex(z_final)
-        z_final[i] = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z[:,i],kn,ks); order=1)
-    end
+function ChainRulesCore.rrule(::typeof(propagate), map, map_jacobian, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
+    z_final = propagate(map, map_jacobian, z, kn, ks)
     
     function propagate_pullback(Δ)
-        jacs = jacobian.(z_final)
+        jacs = Array{Float64}(undef, size(map_jacobian,1), size(map_jacobian,2), size(z,2))
+        for k in 1:size(jacs,3)
+            z_ex = vcat(z[:,k], kn, ks)
+
+            for j in 1:size(jacs,2)
+                for i in 1:size(jacs,1)
+                    jacs[i,j,k] = TS.evaluate(map_jacobian[i,j], z_ex)
+                end
+            end
+        end
         
-        newΔ = Array{eltype(Δ)}(undef, size(jacs[1])[2], size(Δ)[2])
-        for i in 1:size(Δ)[2]
-            newΔ[:,i] .= LA.transpose(jacs[i]) * Δ[:,i]
+        newΔ = Array{eltype(Δ)}(undef, size(jacs,2), size(Δ,2))
+        for i in 1:size(newΔ,2)
+            newΔ[:,i] .= LA.transpose(jacs[:,:,i]) * Δ[:,i]
         end
         
         Δz = newΔ[1:6,:]
         Δkn = newΔ[7:10,:]
         Δks = newΔ[11:end,:]
         
-        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, sum(Δkn, dims=2), sum(Δks, dims=2)
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, sum(Δkn, dims=2), sum(Δks, dims=2)
     end
-    return hcat([TS.constant_term(z_final[i]) for i in eachindex(z_final)]...), propagate_pullback
+    return z_final, propagate_pullback
 end
 
 function propagate(element::T, z::S)::S where {T<:Drift,S<:AbstractVecOrMat}
-    propagate(element.thickMap, z, zeros(4), zeros(4))
+    propagate(element.thickMap, element.thickMap_jacobian, z, zeros(4), zeros(4))
 end
 
 function propagate(element::T, z::S)::S where {T<:Magnet,S<:AbstractVecOrMat}
-    propagate(element.thickMap, z, element.kn, element.ks)
+    propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
 end
 
 function propagate(model::Flux.Chain, z::AbstractVecOrMat)::AbstractVecOrMat
