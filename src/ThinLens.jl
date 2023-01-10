@@ -1,5 +1,8 @@
 module ThinLens
 
+import TaylorSeries
+import TaylorSeries as TS
+
 import ChainRulesCore
 import Flux
 using SnoopPrecompile
@@ -18,6 +21,7 @@ include("Beamlines.jl")
 
 # thick tracking
 include("ThickTrack.jl")
+include("Polynomial.jl")
 
 # convenience methods
 include("Lattice.jl")
