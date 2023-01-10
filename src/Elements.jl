@@ -5,10 +5,10 @@ abstract type BeamlineElement end
 """Drift."""
 mutable struct Drift <: BeamlineElement
     len::Float64
-    thickMap::AbstractVector
+    thickMap::PolyN
 end
 
-Drift(len::Real) = Drift(len, zeros(1))
+Drift(len::Real) = Drift(len, PolyN([zeros(1),], [[[0,],],]))
 
 function (e::Drift)(particles::AbstractVecOrMat)
     p = [particles[i,:] for i in 1:size(particles,1)]
@@ -76,10 +76,12 @@ mutable struct Quadrupole <: Magnet
     ks::AbstractVector
     splitScheme::SplitScheme
     steps::Int
-    thickMap::AbstractVector
+    thickMap::PolyN
 end
 
-Quadrupole(len::Number, k1n::Number, k1s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Quadrupole(len, [0., k1n, 0., 0.], [0., k1s, 0., 0.], split, steps, zeros(1))
+Quadrupole(len::Number, k1n::Number, k1s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Quadrupole(
+    len, [0., k1n, 0., 0.], [0., k1s, 0., 0.], split, steps, PolyN([zeros(1),], [[[0,],],])
+    )
 
 """Sextupole."""
 mutable struct Sextupole <: Magnet
@@ -88,10 +90,12 @@ mutable struct Sextupole <: Magnet
     ks::AbstractVector
     splitScheme::SplitScheme
     steps::Int
-    thickMap::AbstractVector
+    thickMap::PolyN
 end
 
-Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Sextupole(len, [0., 0., k2n, 0.], [0., 0., k2s, 0.], split, steps, zeros(1))
+Sextupole(len::Number, k2n::Number, k2s::Number; split::SplitScheme=splitO2nd, steps::Int=1) = Sextupole(
+    len, [0., 0., k2n, 0.], [0., 0., k2s, 0.], split, steps, PolyN([zeros(1),], [[[0,],],])
+    )
 
 """Bending magnet."""
 mutable struct BendingMagnet <: Magnet

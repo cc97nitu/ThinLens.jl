@@ -1,8 +1,8 @@
-module Polynomial
+# module Polynomial
 
 import TaylorSeries as TS
 
-export PolyN
+# export PolyN
 
 
 struct PolyN{S,T}
@@ -68,4 +68,4 @@ function (p::PolyN{S,T})(z::AbstractVector{U}) where {S<:Number,T<:Int,U<:Number
 end
 
 
-end  # module
+# end  # module

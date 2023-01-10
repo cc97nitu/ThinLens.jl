@@ -93,7 +93,8 @@ Taylor beam dynamics around z with zero field strength.
 function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20)::Nothing where T<:Real
     for cell in model
         for element in cell
-            element.thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+            thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+            element.thickMap = PolyN(thickMap)
         end
     end
 end
@@ -106,8 +107,11 @@ end
 
 Propagate phase space coordinates z through beamline element.
 """
+# function propagate(map, z::T, kn::T, ks::T)::T where T<:AbstractVector
+#     return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
+# end
 function propagate(map, z::T, kn::T, ks::T)::T where T<:AbstractVector
-    return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
+    return map(vcat(z,kn,ks))
 end
 
 function ChainRulesCore.rrule(::typeof(propagate), map, z::T, kn::T, ks::T) where T<:AbstractVector

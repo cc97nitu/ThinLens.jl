@@ -12,6 +12,8 @@ greet() = print("Hello World!")
 
 show() = print(@doc ChainRulesCore.rrule)
 
+include("Polynomial.jl")
+
 # core functionality
 include("Beams.jl")
 include("SplitSchemes.jl")
@@ -21,7 +23,6 @@ include("Beamlines.jl")
 
 # thick tracking
 include("ThickTrack.jl")
-include("Polynomial.jl")
 
 # convenience methods
 include("Lattice.jl")
