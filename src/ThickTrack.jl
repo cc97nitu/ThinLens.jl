@@ -95,6 +95,7 @@ function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20)
         for element in cell
             thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
             element.thickMap = PolyN(thickMap)
+            element.thickMap_jacobian = jacobian(thickMap) |> PolyMN
         end
     end
 end
@@ -107,18 +108,15 @@ end
 
 Propagate phase space coordinates z through beamline element.
 """
-# function propagate(map, z::T, kn::T, ks::T)::T where T<:AbstractVector
-#     return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
-# end
-function propagate(map, z::T, kn::T, ks::T)::T where T<:AbstractVector
-    return map(vcat(z,kn,ks))
+function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::T, kn::T, ks::T)::T where T<:AbstractVector
+    return vcat(z,kn,ks) |> transferMap
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, z::T, kn::T, ks::T) where T<:AbstractVector
-    z_final = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z,kn,ks); order=1)
+function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferMap_jacobian::PolyMN, z::T, kn::T, ks::T) where T<:AbstractVector
+    z_final = propagate(transferMap, transferMap_jacobian, z, kn, ks)
 
     function propagate_pullback(Δ)                
-        jac = jacobian(z_final)
+        jac = vcat(z,kn,ks) |> transferMap_jacobian
         newΔ = LA.transpose(jac) * Δ
         
         Δz = newΔ[1:6]
@@ -127,13 +125,13 @@ function ChainRulesCore.rrule(::typeof(propagate), map, z::T, kn::T, ks::T) wher
 
         return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
     end
-    return TS.constant_term(z_final), propagate_pullback
+    return z_final, propagate_pullback
 end
 
-function propagate(map, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
+function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
     out = similar(z)
     for i in 1:size(z)[2]
-        out[:,i] .= propagate(map, z[:,i], kn, ks)
+        out[:,i] .= propagate(transferMap, transferMap_jacobian, z[:,i], kn, ks)
     end
     return out
 end
@@ -163,11 +161,11 @@ function ChainRulesCore.rrule(::typeof(propagate), map, z::S, kn::T, ks::T) wher
 end
 
 function propagate(element::T, z::S)::S where {T<:Drift,S<:AbstractVecOrMat}
-    propagate(element.thickMap, z, zeros(4), zeros(4))
+    propagate(element.thickMap, element.thickMap_jacobian, z, zeros(4), zeros(4))
 end
 
 function propagate(element::T, z::S)::S where {T<:Magnet,S<:AbstractVecOrMat}
-    propagate(element.thickMap, z, element.kn, element.ks)
+    propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
 end
 
 function propagate(model::Flux.Chain, z::AbstractVecOrMat)::AbstractVecOrMat
@@ -185,17 +183,16 @@ end
 Calculate TaylorSeries jacobian for z.
 """
 function jacobian(z)
-    jac = Array{Float64}(undef, length(z), TS.get_numvars())
+    jac = Matrix{eltype(z)}(undef, length(z), TS.get_numvars())
     
     for i in 1:size(jac)[1]
         for j in 1:size(jac)[2]
-            jac[i,j] = TS.derivative(z[i], j) |> TS.constant_term
+            jac[i,j] = TS.derivative(z[i], j)
         end
     end
     
     return jac
 end
-
 
 """
     plug_in(z::TS.TaylorN{T}, values::Vector{T}, mask_bool::AbstractArray{Bool})::TS.TaylorN{T} where T<:Number

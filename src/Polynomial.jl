@@ -61,11 +61,42 @@ end
 
 
 function (p::PolyN{S,T})(z::AbstractVector{U}) where {S<:Number,T<:Int,U<:Number}
-    @assert length(z) == length(p.coeffTable[1][1])
+    @assert length(z) == length(p.coeffTable[1][1]) "got input dimension $(length(z)), expected $(length(p.coeffTable[1][1]))"
     ndims = length(p.coefficients)
 
     return evaluate(p, z, ndims)
 end
+
+
+struct PolyMN
+    polynomials::Array{PolyN, 1}
+end
+
+
+function PolyMN(m::Matrix{TaylorSeries.TaylorN{S}}) where S<:Number
+    polynomials = Vector{PolyN}(undef, size(m)[1])
+
+    for row in eachindex(polynomials)
+        polynomials[row] = PolyN(m[row,:])
+    end
+    
+    return PolyMN(polynomials)
+end
+
+
+function (p::PolyMN)(z::AbstractVector{U}) where U<:Number
+    result = Matrix{U}(undef, length(p.polynomials), length(p.polynomials[1].coefficients))
+    
+    Threads.@threads for row in 1:size(result)[1]
+        result[row,:] .= p.polynomials[row](z)
+    end
+    
+    return result
+end
+
+
+dummy_PolyN() = PolyN([zeros(1),], [[[0,],],])
+dummy_PolyMN() = PolyMN([dummy_PolyN(),])
 
 
 # end  # module
