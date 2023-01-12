@@ -90,14 +90,27 @@ function init_thickMaps(model::Flux.Chain; z=zeros(6))
 
 Taylor beam dynamics around z with zero field strength.
 """
-function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20)::Nothing where T<:Real
+function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20, similarcells::Bool=false)::Nothing where T<:Real
     for cell in model
         for element in cell
             thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
             element.thickMap = PolyN(thickMap)
             element.thickMap_jacobian = jacobian(thickMap) |> PolyMN
         end
+
+        if similarcells
+            for i in 2:length(model)
+                for j in 1:length(model[i])
+                    model[i][j].thickMap = model[1][j].thickMap
+                    model[i][j].thickMap_jacobian = model[1][j].thickMap_jacobian
+                end
+            end
+
+            return nothing
+        end
     end
+
+    return nothing
 end
 
 
@@ -123,7 +136,7 @@ function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferM
         Δkn = newΔ[7:10]
         Δks = newΔ[11:end]
 
-        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
     end
     return z_final, propagate_pullback
 end
@@ -136,28 +149,35 @@ function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T
     return out
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
-    z_final = Array{typeof(map)}(undef, size(z)[2])
-
-    for i in eachindex(z_final)
-        z_final[i] = TS.taylor_expand((z)->propagate(map,z[1:6],z[7:10],z[11:end]), vcat(z[:,i],kn,ks); order=1)
-    end
+function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
+    z_final = propagate(transferMap, transferMap_jacobian, z, kn, ks)
     
     function propagate_pullback(Δ)
-        jacs = jacobian.(z_final)
-        
-        newΔ = Array{eltype(Δ)}(undef, size(jacs[1])[2], size(Δ)[2])
-        for i in 1:size(Δ)[2]
-            newΔ[:,i] .= LA.transpose(jacs[i]) * Δ[:,i]
+        dims = (
+            length(transferMap_jacobian.polynomials),
+            length(transferMap_jacobian.polynomials[1].coefficients),
+            size(z)[2]
+            )
+
+        jacs = Array{eltype(z)}(undef, dims...)
+
+        for i in 1:size(z)[2]
+            jacs[:,:,i] = vcat(z[:,i], kn, ks) |> transferMap_jacobian
         end
-        
+
+        newΔ = Array{eltype(Δ)}(undef, size(jacs)[2], size(Δ)[2])
+        for i in 1:size(Δ)[2]
+            newΔ[:,i] .= @views LA.transpose(jacs[:,:,i]) * Δ[:,i]
+        end
+
         Δz = newΔ[1:6,:]
         Δkn = newΔ[7:10,:]
         Δks = newΔ[11:end,:]
         
-        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, sum(Δkn, dims=2), sum(Δks, dims=2)
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, sum(Δkn, dims=2), sum(Δks, dims=2)
     end
-    return hcat([TS.constant_term(z_final[i]) for i in eachindex(z_final)]...), propagate_pullback
+
+    return z_final, propagate_pullback
 end
 
 function propagate(element::T, z::S)::S where {T<:Drift,S<:AbstractVecOrMat}
