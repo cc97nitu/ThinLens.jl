@@ -5,21 +5,33 @@ import LinearAlgebra as LA
 """
 Buggy!!!!!!!!
 """
-function A(x, y, kn, ks)
+# function A(x, y, kn, ks)
+#     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
+#     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
+#     ks = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ ks
+
+#     A = 0.
+#     for n in 1:length(kn)
+#         Bn = 1/factorial(n) * kn[n]; An = 1/factorial(n) * ks[n]
+        
+#         A += 1/n * (Bn + im * An) * (x + im * y)^n
+#     end
+        
+#     return 1 * real(A) / 2.
+# end
+
+function A(x, y, kn, sn)
     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
-    ks = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ ks
+    sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
 
-    A = 0.
-    for n in 1:length(kn)
-        Bn = 1/factorial(n) * kn[n]; An = 1/factorial(n) * ks[n]
-        
-        A += 1/n * (Bn + im * An) * (x + im * y)^n
+    magpot = 0.
+    for n in 0:length(kn)-1
+        magpot += 1/factorial(n+1) * (kn[n+1] + im * sn[n+1]) * (x + im * y)^(n+1)
     end
-        
-    return 1 * real(A) / 2.
+    
+    return -1. * real(magpot)
 end
-
 
 """
 hamiltonian(z, A, h)
@@ -121,11 +133,11 @@ end
 
 Propagate phase space coordinates z through beamline element.
 """
-function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::T, kn::T, ks::T)::T where T<:AbstractVector
+function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T)::S where {S<:AbstractArray{<:Number,1},T<:AbstractArray{<:Number,1}}
     return vcat(z,kn,ks) |> transferMap
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferMap_jacobian::PolyMN, z::T, kn::T, ks::T) where T<:AbstractVector
+function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferMap_jacobian::PolyMN, z::T, kn::T, ks::T) where T<:AbstractVector{<:Number}
     z_final = propagate(transferMap, transferMap_jacobian, z, kn, ks)
 
     function propagate_pullback(Δ)                
@@ -141,7 +153,7 @@ function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferM
     return z_final, propagate_pullback
 end
 
-function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
+function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T)::S where {S<:AbstractArray{<:Number,2},T<:AbstractArray{<:Number,1}}
     out = similar(z)
     for i in 1:size(z)[2]
         out[:,i] .= propagate(transferMap, transferMap_jacobian, z[:,i], kn, ks)
