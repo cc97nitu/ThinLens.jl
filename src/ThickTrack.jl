@@ -5,21 +5,33 @@ import LinearAlgebra as LA
 """
 Buggy!!!!!!!!
 """
-function A(x, y, kn, ks)
+# function A(x, y, kn, ks)
+#     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
+#     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
+#     ks = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ ks
+
+#     A = 0.
+#     for n in 1:length(kn)
+#         Bn = 1/factorial(n) * kn[n]; An = 1/factorial(n) * ks[n]
+        
+#         A += 1/n * (Bn + im * An) * (x + im * y)^n
+#     end
+        
+#     return 1 * real(A) / 2.
+# end
+
+function A(x, y, kn, sn)
     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
-    ks = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ ks
+    sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
 
-    A = 0.
-    for n in 1:length(kn)
-        Bn = 1/factorial(n) * kn[n]; An = 1/factorial(n) * ks[n]
-        
-        A += 1/n * (Bn + im * An) * (x + im * y)^n
+    magpot = 0.
+    for n in 0:length(kn)-1
+        magpot += 1/factorial(n+1) * (kn[n+1] + im * sn[n+1]) * (x + im * y)^(n+1)
     end
-        
-    return 1 * real(A) / 2.
+    
+    return -1. * real(magpot)
 end
-
 
 """
 hamiltonian(z, A, h)
@@ -90,21 +102,27 @@ function init_thickMaps(model::Flux.Chain; z=zeros(6))
 
 Taylor beam dynamics around z with zero field strength.
 """
-function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20)::Nothing where T<:Real
+function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20, similarcells::Bool=false)::Nothing where T<:Real
     for cell in model
         for element in cell
-            element.thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+            thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+            element.thickMap = PolyN(thickMap)
+            element.thickMap_jacobian = jacobian(thickMap) |> PolyMN
+        end
 
-            jacobian = Array{eltype(element.thickMap)}(undef, length(element.thickMap), TS.get_numvars())
-            for j in 1:size(jacobian,2)
-                for i in 1:size(jacobian,1)
-                    jacobian[i,j] = TS.derivative(element.thickMap[i], j)
+        if similarcells
+            for i in 2:length(model)
+                for j in 1:length(model[i])
+                    model[i][j].thickMap = model[1][j].thickMap
+                    model[i][j].thickMap_jacobian = model[1][j].thickMap_jacobian
                 end
             end
 
-            element.thickMap_jacobian = jacobian
+            return nothing
         end
     end
+
+    return nothing
 end
 
 
@@ -115,22 +133,15 @@ end
 
 Propagate phase space coordinates z through beamline element.
 """
-function propagate(map, map_jacobian, z::T, kn::T, ks::T)::T where T<:AbstractVector
-    return [TS.evaluate(map[i], vcat(z, kn, ks)) for i in 1:length(map)]
+function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T)::S where {S<:AbstractArray{<:Number,1},T<:AbstractArray{<:Number,1}}
+    return vcat(z,kn,ks) |> transferMap
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, map_jacobian, z::T, kn::T, ks::T) where T<:AbstractVector
-    z_final = propagate(map, map_jacobian, z, kn, ks)
+function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferMap_jacobian::PolyMN, z::T, kn::T, ks::T) where T<:AbstractVector{<:Number}
+    z_final = propagate(transferMap, transferMap_jacobian, z, kn, ks)
 
-    function propagate_pullback(Δ)
-        z_ex = vcat(z, kn, ks)            
-        jac = Array{Float64}(undef, size(map_jacobian)...)
-        for j in 1:size(jac,2)
-            for i in 1:size(jac,1)
-                jac[i,j] = TS.evaluate(map_jacobian[i,j], z_ex)
-            end
-        end
-
+    function propagate_pullback(Δ)                
+        jac = vcat(z,kn,ks) |> transferMap_jacobian
         newΔ = LA.transpose(jac) * Δ
         
         Δz = newΔ[1:6]
@@ -139,43 +150,45 @@ function ChainRulesCore.rrule(::typeof(propagate), map, map_jacobian, z::T, kn::
 
         return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, Δkn, Δks
     end
-    return TS.constant_term(z_final), propagate_pullback
+    return z_final, propagate_pullback
 end
 
-function propagate(map, map_jacobian, z::S, kn::T, ks::T)::S where {S<:AbstractArray,T<:AbstractVector}
+function propagate(transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T)::S where {S<:AbstractArray{<:Number,2},T<:AbstractArray{<:Number,1}}
     out = similar(z)
     for i in 1:size(z)[2]
-        out[:,i] .= propagate(map, map_jacobian, z[:,i], kn, ks)
+        out[:,i] .= propagate(transferMap, transferMap_jacobian, z[:,i], kn, ks)
     end
     return out
 end
 
-function ChainRulesCore.rrule(::typeof(propagate), map, map_jacobian, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
-    z_final = propagate(map, map_jacobian, z, kn, ks)
+function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferMap_jacobian::PolyMN, z::S, kn::T, ks::T) where {S<:AbstractArray,T<:AbstractVector}
+    z_final = propagate(transferMap, transferMap_jacobian, z, kn, ks)
     
     function propagate_pullback(Δ)
-        jacs = Array{Float64}(undef, size(map_jacobian,1), size(map_jacobian,2), size(z,2))
-        for k in 1:size(jacs,3)
-            z_ex = vcat(z[:,k], kn, ks)
+        dims = (
+            length(transferMap_jacobian.polynomials),
+            length(transferMap_jacobian.polynomials[1].coefficients),
+            size(z)[2]
+            )
 
-            for j in 1:size(jacs,2)
-                for i in 1:size(jacs,1)
-                    jacs[i,j,k] = TS.evaluate(map_jacobian[i,j], z_ex)
-                end
-            end
+        jacs = Array{eltype(z)}(undef, dims...)
+
+        for i in 1:size(z)[2]
+            jacs[:,:,i] = vcat(z[:,i], kn, ks) |> transferMap_jacobian
         end
-        
-        newΔ = Array{eltype(Δ)}(undef, size(jacs,2), size(Δ,2))
-        for i in 1:size(newΔ,2)
-            newΔ[:,i] .= LA.transpose(jacs[:,:,i]) * Δ[:,i]
+
+        newΔ = Array{eltype(Δ)}(undef, size(jacs)[2], size(Δ)[2])
+        for i in 1:size(Δ)[2]
+            newΔ[:,i] .= @views LA.transpose(jacs[:,:,i]) * Δ[:,i]
         end
-        
+
         Δz = newΔ[1:6,:]
         Δkn = newΔ[7:10,:]
         Δks = newΔ[11:end,:]
         
         return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), Δz, sum(Δkn, dims=2), sum(Δks, dims=2)
     end
+
     return z_final, propagate_pullback
 end
 
@@ -202,17 +215,16 @@ end
 Calculate TaylorSeries jacobian for z.
 """
 function jacobian(z)
-    jac = Array{Float64}(undef, length(z), TS.get_numvars())
+    jac = Matrix{eltype(z)}(undef, length(z), TS.get_numvars())
     
     for i in 1:size(jac)[1]
         for j in 1:size(jac)[2]
-            jac[i,j] = TS.derivative(z[i], j) |> TS.constant_term
+            jac[i,j] = TS.derivative(z[i], j)
         end
     end
     
     return jac
 end
-
 
 """
     plug_in(z::TS.TaylorN{T}, values::Vector{T}, mask_bool::AbstractArray{Bool})::TS.TaylorN{T} where T<:Number

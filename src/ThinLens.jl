@@ -1,5 +1,8 @@
 module ThinLens
 
+import TaylorSeries
+import TaylorSeries as TS
+
 import ChainRulesCore
 import Flux
 using SnoopPrecompile
@@ -8,6 +11,8 @@ using SnoopPrecompile
 greet() = print("Hello World!")
 
 show() = print(@doc ChainRulesCore.rrule)
+
+include("Polynomial.jl")
 
 # core functionality
 include("Beams.jl")
