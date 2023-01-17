@@ -20,17 +20,43 @@ Buggy!!!!!!!!
 #     return 1 * real(A) / 2.
 # end
 
+# function A(x, y, kn, sn)
+#     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
+#     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
+#     sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
+
+#     magpot = 0.
+#     for n in 0:length(kn)-1
+#         magpot += 1/factorial(n+1) * (kn[n+1] + im * sn[n+1]) * (x + im * y)^(n+1)
+#     end
+    
+#     return -1. * real(magpot)
+# end
+
+# function A(x, y, kn, sn)
+#     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
+#     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
+#     sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
+
+#     magpot = 0.
+#     for n in 1:length(kn)
+#         magpot += 1/(factorial(n)*n) * (kn[n] + im * sn[n]) * (x + im * y)^(n)
+#     end
+    
+#     return real(magpot) / 2.
+# end
+
 function A(x, y, kn, sn)
     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
     sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
 
     magpot = 0.
-    for n in 0:length(kn)-1
-        magpot += 1/factorial(n+1) * (kn[n+1] + im * sn[n+1]) * (x + im * y)^(n+1)
+    for n in 1:length(kn)
+        magpot += 1/(factorial(n)*n^2) * (kn[n] + im * sn[n]) * (x + im * y)^(n)
     end
     
-    return -1. * real(magpot)
+    return real(magpot)
 end
 
 """
@@ -198,6 +224,25 @@ end
 
 function propagate(element::T, z::S)::S where {T<:Magnet,S<:AbstractVecOrMat}
     propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
+end
+
+function propagate(element::T, z::S)::S where {T<:BendingMagnet,S<:AbstractVecOrMat}
+    # entry face
+    p = [z[i,:] for i in 1:size(z,1)]
+    p = dipoleEdge(p..., zeros(size(z,1)), element.len, element.α, element.ϵ1)
+    for i in 1:size(z, 1)
+        z[i,:] .= p[i]
+    end
+
+    z = propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
+
+    p = [z[i,:] for i in 1:size(z,1)]
+    p = dipoleEdge(p..., zeros(size(z,1)), element.len, element.α, element.ϵ1)
+    for i in 1:size(z, 1)
+        z[i,:] .= p[i]
+    end
+
+    return z
 end
 
 function propagate(model::Flux.Chain, z::AbstractVecOrMat)::AbstractVecOrMat

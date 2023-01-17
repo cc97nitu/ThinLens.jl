@@ -98,7 +98,7 @@ function SIS18_Lattice_FODO(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float
 end
 
 
-function SIS18_Cell_noDipoles(k1f::Float64=0.364439095886585, k1d::Float64=0.34369003221817673, k2f::Float64=0., k2d::Float64=0.; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
+function SIS18_Cell_noDipoles(k1f::Float64=0.364439095886585, k1d::Float64=-0.34369003221817673, k2f::Float64=0., k2d::Float64=0.; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     # bending magnets
     bendingAngle = 0.2617993878
     rb1 = ThinLens.Drift(2.617993878)

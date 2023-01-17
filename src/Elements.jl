@@ -111,11 +111,15 @@ mutable struct BendingMagnet <: Magnet
     ϵ2::Float64
     splitScheme::SplitScheme
     steps::Int
+    thickMap::PolyN
+    thickMap_jacobian::PolyMN
 end
 
-SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1, ϵ2, split, steps)
+SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(
+    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1, ϵ2, split, steps, dummy_PolyN(), dummy_PolyMN())
 
-RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, split, steps)
+RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(
+    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, split, steps, dummy_PolyN(), dummy_PolyMN())
 
 function (e::BendingMagnet)(particles::AbstractVecOrMat)
     p = [particles[i,:] for i in 1:size(particles,1)]
