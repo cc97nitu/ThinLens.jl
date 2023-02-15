@@ -64,12 +64,17 @@ hamiltonian(z, A, h)
 
 Hamiltonian of EM-fields, with z phase space coordinates, A magnetic vector potential and h horizontal curvature.
 """
+# function hamiltonian(z, A, h)
+#     x, a, y, b, Δs, δ = [TS.TaylorN(i) for i in 1:length(z)] .+ TS.constant_term(z)
+    
+#     return δ - (1. - h*x) * ( sqrt((1. + δ)^2 - a^2 - b^2) - A)
+# end
+
 function hamiltonian(z, A, h)
     x, a, y, b, Δs, δ = [TS.TaylorN(i) for i in 1:length(z)] .+ TS.constant_term(z)
     
-    return δ - (1. - h*x) * ( sqrt((1. + δ)^2 - a^2 - b^2) - A)
+    return δ - (1. - h*x) * ( sqrt((1. + δ)^2 - a^2 - b^2) ) - A
 end
-
 
 """
 poissonBracket(h, z)

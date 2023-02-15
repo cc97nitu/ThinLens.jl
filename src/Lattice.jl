@@ -203,7 +203,7 @@ function SIS18_Lattice(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
 end
 
 
-function SPS_Cell(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
+function SPS_Cell(k1f::Float64=1.19761e-02, k1d::Float64=-1.19761e-02, k2f::Float64=0., k2d::Float64=0.;
     split::ThinLens.SplitScheme=split, steps::Int=steps, mergeDipoles::Bool=false)
     # bending magnets
     bendingAngle = 0.
@@ -250,7 +250,7 @@ function SPS_Cell(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
     end
 end
 
-function SPS_Lattice(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
+function SPS_Lattice(k1f::Float64=1.19761e-02, k1d::Float64=-1.19761e-02, k2f::Float64=0., k2d::Float64=0.;
     nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1, mergeDipoles::Bool=false)
 
     if nested

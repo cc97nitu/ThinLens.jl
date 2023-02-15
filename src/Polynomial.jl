@@ -12,7 +12,7 @@ end
 
 
 function PolyN(t::Vector{TS.TaylorN{T}}) where T<:Number
-    coeffTable = TS.coeff_table
+    coeffTable = TS.coeff_table |> copy
     noCoeff = coeffTable .|> length |> sum
     
     coefficients = [Vector{TS.numtype(t[1])}(undef, noCoeff) for _ in eachindex(t)]
