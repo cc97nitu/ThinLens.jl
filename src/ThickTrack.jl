@@ -46,17 +46,26 @@ Buggy!!!!!!!!
 #     return real(magpot) / 2.
 # end
 
-function A(x, y, kn, sn)
-    x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
-    kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
-    sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
+# function A(x, y, kn, sn)
+#     x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y]    
+#     kn = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
+#     sn = [TS.TaylorN(11), TS.TaylorN(12), TS.TaylorN(13), TS.TaylorN(14)] .+ sn
 
-    magpot = 0.
-    for n in 1:length(kn)
-        magpot += 1/(factorial(n)*n^2) * (kn[n] + im * sn[n]) * (x + im * y)^(n)
-    end
+#     magpot = 0.
+#     for n in 1:length(kn)
+#         magpot += 1/(factorial(n)*n^2) * (kn[n] + im * sn[n]) * (x + im * y)^(n)
+#     end
     
-    return real(magpot)
+#     return real(magpot)
+# end
+
+# MAD-X manual
+function A(x,y,kn,sn)
+    x, y = [TS.TaylorN(1), TS.TaylorN(3)] .+ [x, y] 
+    k0, k1, k2, k3 = [TS.TaylorN(7), TS.TaylorN(8), TS.TaylorN(9), TS.TaylorN(10)] .+ kn
+
+    As = k0*x + 1/2 * k1*(x^2 - y^2) + 1/6 * k2*(x^3 - 3*x*y^2) + 1/24 * k3*(x^4 - 6*x^2*y^2 + y^4)
+    return -1/4 * As
 end
 
 """
@@ -109,7 +118,7 @@ end
 
 Track z through EM-field specified by kn, ks, A, and curvature hx.
 """
-function thick_integration(z, kn, ks, hx; stepsize=1e-2, power::Int=20)
+function thick_integration(z, kn, ks, hx; stepsize=1e-2, power::Int=30)
     z_in = [TS.TaylorN(i) for i in 1:length(z)] .+ TS.constant_term(z)
     z = [TS.TaylorN(i) for i in 1:length(z)] .+ TS.constant_term(z)
     
@@ -121,7 +130,7 @@ function thick_integration(z, kn, ks, hx; stepsize=1e-2, power::Int=20)
     # do poisson
     for i in 1:power
         z_in = poissonBracket(h, z_in)
-        z += (-stepsize)^i/factorial(i) * z_in
+        z += (-stepsize)^i/factorial(big(i)) * z_in
     end
     
     return z
@@ -136,7 +145,11 @@ Taylor beam dynamics around z with zero field strength.
 function init_thickMaps(model::Flux.Chain; z::Vector{T}=zeros(6), power::Int=20, similarcells::Bool=false)::Nothing where T<:Real
     for cell in model
         for element in cell
-            thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+            if typeof(element) <: Magnet
+                thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len / element.steps, power=power)
+            else
+                thickMap = thick_integration(z, zeros(4), zeros(4), 0.; stepsize=element.len, power=power)
+            end
             element.thickMap = PolyN(thickMap)
             element.thickMap_jacobian = jacobian(thickMap) |> PolyMN
         end
@@ -223,13 +236,26 @@ function ChainRulesCore.rrule(::typeof(propagate), transferMap::PolyN, transferM
     return z_final, propagate_pullback
 end
 
+# function propagate(element::T, z::S)::S where {T<:Drift,S<:AbstractVecOrMat}
+#     propagate(element.thickMap, element.thickMap_jacobian, z, zeros(4), zeros(4))
+# end
+
 function propagate(element::T, z::S)::S where {T<:Drift,S<:AbstractVecOrMat}
     propagate(element.thickMap, element.thickMap_jacobian, z, zeros(4), zeros(4))
 end
-
+    
 function propagate(element::T, z::S)::S where {T<:Magnet,S<:AbstractVecOrMat}
-    propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
+    for step in 1:element.steps
+        z = propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
+    end
+
+    return z
 end
+
+
+# function propagate(element::T, z::S)::S where {T<:Magnet,S<:AbstractVecOrMat}
+#     propagate(element.thickMap, element.thickMap_jacobian, z, element.kn, element.ks)
+# end
 
 function propagate(element::T, z::S)::S where {T<:BendingMagnet,S<:AbstractVecOrMat}
     # entry face
