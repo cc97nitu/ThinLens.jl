@@ -11,26 +11,51 @@ struct PolyN{S,T}
 end
 
 
-function PolyN(t::Vector{TS.TaylorN{T}}) where T<:Number
-    coeffTable = TS.coeff_table |> copy
-    noCoeff = coeffTable .|> length |> sum
+# function PolyN(t::Vector{TS.TaylorN{T}}) where T<:Number
+#     coeffTable = TS.coeff_table |> copy
+#     noCoeff = coeffTable .|> length |> sum
     
-    coefficients = [Vector{TS.numtype(t[1])}(undef, noCoeff) for _ in eachindex(t)]
+#     coefficients = [Vector{TS.numtype(t[1])}(undef, noCoeff) for _ in eachindex(t)]
     
-    for n in eachindex(coefficients)
-        c = 1
-        for i in eachindex(coeffTable)
-            for j in eachindex(coeffTable[i])
-                coefficients[n][c] = TS.getcoeff(t[n], coeffTable[i][j])
+#     for n in eachindex(coefficients)
+#         c = 1
+#         for i in eachindex(coeffTable)
+#             for j in eachindex(coeffTable[i])
+#                 coefficients[n][c] = TS.getcoeff(t[n], coeffTable[i][j])
 
-                c += 1
+#                 c += 1
+#             end
+#         end
+#     end
+    
+#     return PolyN(coefficients, coeffTable)
+# end
+
+function PolyN(t::Vector{TS.TaylorN{T}}) where T<:Number
+    coefficients = [[TS.getcoeff(t[k], TS.coeff_table[1][1]) |> Float64] for k in eachindex(t)]
+    coeffTable = [[TS.coeff_table[1][1]]]
+
+    # iterate over multi-indices
+    for i in 2:length(TS.coeff_table)  # iterate over orders
+        allidx = []
+        for j in eachindex(TS.coeff_table[i])
+            allcoeff = [TS.getcoeff(t[k], TS.coeff_table[i][j]) for k in eachindex(t)]
+            iszero(allcoeff) && continue
+            
+            push!(allidx, TS.coeff_table[i][j])
+            for k in eachindex(allcoeff)
+                push!(coefficients[k], allcoeff[k] .|> Float64)
             end
         end
+        
+        length(allidx) > 0 && push!(coeffTable, allidx)
     end
+    
+    coefficients = identity.([identity.(coefficients[i]) for i in eachindex(coefficients)])
+    coeffTable = identity.([identity.(coeffTable[k]) for k in eachindex(coeffTable)])
     
     return PolyN(coefficients, coeffTable)
 end
-
 
 function evaluate(p::PolyN{S,T}, z::AbstractVector{U}, ndims::T) where {S<:Number,T<:Int,U<:Number}
     result = Vector{U}(undef, ndims)

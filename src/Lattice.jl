@@ -203,6 +203,60 @@ function SIS18_Lattice(k1f::Float64, k1d::Float64, k2f::Float64, k2d::Float64;
 end
 
 
+function SPS_Cell_noDipoles(k1f::Float64=1.19761e-02, k1d::Float64=-1.19761e-02, k2f::Float64=0., k2d::Float64=0.;
+    split::ThinLens.SplitScheme=split, steps::Int=steps, mergeDipoles::Bool=false)
+
+    # quadrupoles
+    qf = ThinLens.Quadrupole(3.085, k1f, 0; split=split, steps=steps)
+    qd = ThinLens.Quadrupole(3.085, k1d, 0; split=split, steps=steps)
+
+    # sextupoles
+    sf = ThinLens.Sextupole(0.423, k2f, 0; split=split, steps=steps)
+    sd = ThinLens.Sextupole(0.42, k2d, 0; split=split, steps=steps)
+
+    # drifts
+    d0 = ThinLens.Drift(0.7855)
+    d1 = ThinLens.Drift(0.36)
+    d2 = ThinLens.Drift(0.4)
+    d3 = ThinLens.Drift(0.39)
+    d4 = ThinLens.Drift(0.38)
+    d5 = ThinLens.Drift(0.9242)
+    d6 = ThinLens.Drift(0.9985)
+    d7 = ThinLens.Drift(0.35)
+    d8 = ThinLens.Drift(0.38)
+    d9 = ThinLens.Drift(0.39)
+    d10 = ThinLens.Drift(0.4)
+    d11 = ThinLens.Drift(1.1488)
+
+    # bending section merged into single drift
+    bendA = ThinLens.Drift(4*6.26 + d2.len + d3.len + d4.len)
+    bendB = ThinLens.Drift(4*6.26 + d8.len + d9.len + d10.len)
+    return Flux.Chain(sf, d0, qf, d1, bendA, d5,
+        sd, d6, qd, d7, bendB, d11)
+end
+
+
+function SPS_Lattice_noDipoles(k1f::Float64=1.19761e-02, k1d::Float64=-1.19761e-02, k2f::Float64=0., k2d::Float64=0.;
+    nested::Bool=true, cellsIdentical::Bool=false, split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1, mergeDipoles::Bool=false)
+
+    if nested
+        if cellsIdentical
+            cell = SPS_Cell_noDipoles(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles)
+            return ThinLens.NestedChain([cell for _ in 1:104])
+        else
+            return ThinLens.NestedChain([SPS_Cell_noDipoles(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles) for _ in 1:104])
+        end
+    else
+        if cellsIdentical
+            cell = SPS_Cell_noDipoles(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles)
+            return ThinLens.FlatChain([cell for _ in 1:104])
+        else
+            return ThinLens.FlatChain([SPS_Cell_noDipoles(k1f, k1d, k2f, k2d; split=split, steps=steps, mergeDipoles=mergeDipoles) for _ in 1:104])
+        end
+    end
+end
+
+
 function SPS_Cell(k1f::Float64=1.19761e-02, k1d::Float64=-1.19761e-02, k2f::Float64=0., k2d::Float64=0.;
     split::ThinLens.SplitScheme=split, steps::Int=steps, mergeDipoles::Bool=false)
     # bending magnets
