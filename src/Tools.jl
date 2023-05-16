@@ -7,6 +7,10 @@ import FFTW
 import EasyFit
 import ThinLens as TL
 
+
+include("Matching.jl")
+
+
 """
     getTuneChroma_fft(model, beam::TL.Beam, turns::Int)
 
