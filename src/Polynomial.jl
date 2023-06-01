@@ -93,8 +93,8 @@ function (p::PolyN{S,T})(z::AbstractVector{U}) where {S<:Number,T<:Int,U<:Number
 end
 
 
-struct PolyMN
-    polynomials::Array{PolyN, 1}
+struct PolyMN{S,T}
+    polynomials::Array{PolyN{S,T}, 1}
 end
 
 
