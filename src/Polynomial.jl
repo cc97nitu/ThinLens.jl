@@ -1,5 +1,7 @@
 # module Polynomial
 
+import Flux
+import ChainRulesCore
 import TaylorSeries as TS
 
 # export PolyN
@@ -98,8 +100,20 @@ struct PolyMN{S,T}
 end
 
 
-function PolyMN(m::Matrix{TaylorSeries.TaylorN{S}}) where S<:Number
-    polynomials = Vector{PolyN}(undef, size(m)[1])
+# function PolyMN(m::Matrix{TaylorSeries.TaylorN{S}}) where S<:Number
+#     polynomials = Vector{PolyN}(undef, size(m)[1])
+
+#     for row in eachindex(polynomials)
+#         polynomials[row] = PolyN(m[row,:])
+#     end
+    
+#     return PolyMN(polynomials)
+# end
+
+
+function PolyMN(m)
+    x = PolyN(m[1,:])
+    polynomials = Vector{typeof(x)}(undef, size(m)[1])
 
     for row in eachindex(polynomials)
         polynomials[row] = PolyN(m[row,:])
@@ -124,4 +138,53 @@ dummy_PolyN() = PolyN([zeros(1),], [[[0,],],])
 dummy_PolyMN() = PolyMN([dummy_PolyN(),])
 
 
-# end  # module
+struct PolyLayer{S,T}
+    poly::PolyN{S,T}
+    gradient::PolyMN{S,T}
+end
+
+
+function CallPolyLayer(p::PolyLayer, particles::Matrix{T}) where T
+    out = copy(particles)
+    return p.poly(out)
+end
+
+
+function ChainRulesCore.rrule(::typeof(CallPolyLayer), p::PolyLayer, particles::Matrix{T}) where T
+    out = copy(particles)
+    p.poly(out)
+    
+    function polyLayer_pullback(Δ::T) where T
+        newΔ = Array{eltype(Δ)}(undef, length(p.gradient.polynomials[1].coefficients), size(Δ,2))
+        @Threads.threads for i in axes(Δ,2)
+            newΔ[:,i] .= @views LA.transpose(p.gradient(particles[:,i])) * Δ[:,i]
+        end
+        
+        return ChainRulesCore.NoTangent(), ChainRulesCore.NoTangent(), newΔ
+    end
+    
+    return out, polyLayer_pullback
+end
+
+
+function (p::PolyLayer)(particles::Matrix{T}) where T
+    return CallPolyLayer(p, particles)
+end
+
+
+function TaylorModel(model::Flux.Chain, z0)
+    layers = []
+    for i in 1:length(model)
+        t = model[i](z0)[:,1]
+        cell_taylored = PolyN(t);
+        jac_cell_taylored = PolyMN(jacobian(t));
+        
+        layer = PolyLayer(cell_taylored, jac_cell_taylored)
+        push!(layers, layer)
+    end
+    
+    return Flux.Chain(layers...)
+end
+
+
+# end module
