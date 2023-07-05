@@ -120,3 +120,18 @@ macro track(turns)
     head = :(track_long(model::Flux.Chain, particles::AbstractVecOrMat))
     return Expr(:function, head, body)
 end
+
+macro track_preTrack(turns)
+    results = [Symbol("z", i) for i in 1:turns+1]
+    
+    body = Expr(:block)
+    push!(body.args, :($(results[1]) = reshape( preTrack(particles), (size(particles,1), 1, size(particles,2))) ))
+
+    for i in 2:length(results)
+        push!(body.args, :($(results[i]) = track_oneTurn(model, $(results[i-1])[:,end,:])))
+    end
+    push!(body.args, :(cat($(results...), dims=2)))
+    
+    head = :(track_long(preTrack::Flux.Chain, model::Flux.Chain, particles::AbstractVecOrMat))
+    return Expr(:function, head, body)
+end
