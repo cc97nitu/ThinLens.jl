@@ -109,6 +109,8 @@ mutable struct BendingMagnet <: Magnet
     β::Float64  # vertical deflection angle ref. trajectory
     ϵ1::Float64
     ϵ2::Float64
+    hgap::Float64
+    fint::Float64
     splitScheme::SplitScheme
     steps::Int
     thickMap::PolyN
@@ -116,16 +118,30 @@ mutable struct BendingMagnet <: Magnet
 end
 
 SBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(
-    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1, ϵ2, split, steps, dummy_PolyN(), dummy_PolyMN())
+    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1, ϵ2, 0., 0.,
+    split, steps, dummy_PolyN(), dummy_PolyMN()
+    )
 
 RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(
-    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, split, steps, dummy_PolyN(), dummy_PolyMN())
+    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, 0., 0.,
+    split, steps, dummy_PolyN(), dummy_PolyMN()
+    )
+
+RBen(len::Number, α::Number, ϵ1::Number, ϵ2::Number, hgap::Number, fint::Number; split::SplitScheme=splitO2nd, steps::Int=1) = BendingMagnet(
+    len, [α / len, 0., 0., 0.], [0., 0., 0., 0.], α, 0., ϵ1 + α/2, ϵ2 + α/2, hgap, fint,
+    split, steps, dummy_PolyN(), dummy_PolyMN()
+    )
+    
 
 function (e::BendingMagnet)(particles::AbstractVecOrMat)
     p = [particles[i,:] for i in 1:size(particles,1)]
     
     # entry pole face
-    p = dipoleEdge(p..., e.len, e.α, e.ϵ1)
+    if iszero(e.hgap) && iszero(e.fint)
+        p = dipoleEdge(p..., e.len, e.α, e.ϵ1)
+    else
+        p = dipoleEdge(p..., e.len, e.α, e.ϵ1, e.hgap, e.fint)
+    end
 
     stepLength = e.len / e.steps
     for _ in 1:e.steps
@@ -141,7 +157,11 @@ function (e::BendingMagnet)(particles::AbstractVecOrMat)
     end
 
     # exit pole face
-    p = dipoleEdge(p..., e.len, e.α, e.ϵ2)
+    if iszero(e.hgap) && iszero(e.fint)
+        p = dipoleEdge(p..., e.len, e.α, e.ϵ2)
+    else
+        p = dipoleEdge(p..., e.len, e.α, e.ϵ2, e.hgap, e.fint)
+    end
     
     return vcat(transpose.(p)...)
 end

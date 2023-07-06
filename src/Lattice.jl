@@ -204,12 +204,12 @@ end
 
 
 # adapted to El Hayek Lattice via MAD-X twiss table
-function SIS18_Cell_triplet(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Float64, k2d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
+function SIS18_Cell_triplet_odd(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Float64, k2d::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
     # bending magnets
     # bendingAngle = 0.2725332
     bendingAngle = 0.2617993877991494
-    rb1 = ThinLens.RBen(2.725332, bendingAngle, 0, 0; split=split, steps=steps)
-    rb2 = ThinLens.RBen(2.725332, bendingAngle, 0, 0; split=split, steps=steps)
+    rb1 = ThinLens.RBen(2.725332, bendingAngle, 0, 0, 0.045, 0.35; split=split, steps=steps)
+    rb2 = ThinLens.RBen(2.725332, bendingAngle, 0, 0, 0.045, 0.35; split=split, steps=steps)
 
     # quadrupoles
     qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split, steps=steps)
@@ -237,15 +237,47 @@ function SIS18_Cell_triplet(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Float
 end
 
 
+function SIS18_Cell_triplet_even(k1f::Float64, k1d::Float64, k1t::Float64; split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)
+    # bending magnets
+    # bendingAngle = 0.2725332
+    bendingAngle = 0.2617993877991494
+    rb1 = ThinLens.RBen(2.725332, bendingAngle, 0, 0, 0.045, 0.35; split=split, steps=steps)
+    rb2 = ThinLens.RBen(2.725332, bendingAngle, 0, 0, 0.045, 0.35; split=split, steps=steps)
+
+    # quadrupoles
+    qs1f = ThinLens.Quadrupole(1.04, k1f, 0; split=split, steps=steps)
+    qs2d = ThinLens.Quadrupole(1.04, k1d, 0; split=split, steps=steps)
+    qs3t = ThinLens.Quadrupole(0.4804, k1t, 0; split=split, steps=steps)
+   
+    # drifts
+    d1 = ThinLens.Drift(0.221334)
+    d2 = ThinLens.Drift(0.862668)
+    d3 = ThinLens.Drift(6.290334 + 0.32 + 0.175)
+    d4 = ThinLens.Drift(0.6)
+    d5 = ThinLens.Drift(0.195 + 0.32 + 0.195)
+
+    hMon = ThinLens.Drift(0.87)
+
+    # set up beamline
+    #Flux.Chain(d1, rb1, d2, rb2 d3a, ks1c, d3b, qs1f, d4, qs2d, d5a, ks3c, d5b, qs3t, d6a, hMon, vMonDrift, d6b)  # actual layout
+    Flux.Chain(d1, rb1, d2, rb2, d3, qs1f, d4, qs2d, d5, qs3t, hMon)
+end
+
+
 function SIS18_Lattice_QKicker(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Float64, k2d::Float64;
     split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)   
     # distance between kicker GS05MQ1 to GS05KS1C
     d1 = ThinLens.Drift(3.082)
 
     # set up beamline
-    lattice = [SIS18_Cell_triplet(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps) for _ in 1:12]
+    cells_even = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
+    cells_odd = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
+    lattice = []
+    for i in 1:6
+        push!(lattice, cells_even[i])
+        push!(lattice, cells_odd[i])
+    end
 
-    # GS05MQ1_to_GS05DX5H = Flux.Chain(d1, ks1c, d3b, qs1f, d4, qs2d, d5a, ks3c, d5b, qs3t, hMon)
     GS05MQ1_to_GS05DX5H = Flux.Chain(d1, lattice[end][6:end]...)
     allCells = [GS05MQ1_to_GS05DX5H, lattice...]
 
