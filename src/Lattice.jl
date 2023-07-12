@@ -271,7 +271,7 @@ function SIS18_Lattice_QKicker(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Fl
 
     # set up beamline
     cells_even = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
-    cells_odd = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
+    cells_odd = [SIS18_Cell_triplet_odd(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps) for _ in 1:6]
     lattice = []
     for i in 1:6
         push!(lattice, cells_even[i])

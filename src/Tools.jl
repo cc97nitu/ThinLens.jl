@@ -120,6 +120,35 @@ function getTunes_jacobian(model)
     return μ ./ (2*π)
 end
 
+
+"""
+    getTunesChroma_ts(model)
+
+Calculate tunes and chromaticities from linearized one-turn map obtained via TaylorSeries.jl.
+"""
+function getTunesChroma_ts(model)
+    old_vars = TS.get_variable_names()
+    old_order = TS.get_order()
+    
+    # get chroma
+    origin = TS.set_variables("x a y b σ δ β0β", order=2)
+    origin[7] += 1
+    
+    oneTurnMap = TL.jacobian(model(origin))
+    
+    tr_x = oneTurnMap[1,1] + oneTurnMap[2,2]
+    Q_x = 1/(2π) * acos(1/2 * tr_x)
+    ξ_x = TS.derivative(Q_x, :δ)
+    
+    tr_y = oneTurnMap[3,3] + oneTurnMap[4,4]
+    Q_y = 1/(2π) * acos(1/2 * tr_y)
+    ξ_y = TS.derivative(Q_y, :δ)
+    
+    # restore previous TS setting
+    TS.set_variables(join(old_vars, " "), order=old_order)
+    
+    return TS.constant_term(Q_x), TS.constant_term(Q_y), TS.constant_term(ξ_x), TS.constant_term(ξ_y)
+end
 """
     function twiss(model)::Dict{Symbol, Any}
 
