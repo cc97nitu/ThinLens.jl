@@ -265,13 +265,23 @@ end
 
 
 function SIS18_Lattice_QKicker(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Float64, k2d::Float64;
-    split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1)   
+    split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1, cellsIdentical::Bool=false)   
     # distance between kicker GS05MQ1 to GS05KS1C
     d1 = ThinLens.Drift(3.082)
 
     # set up beamline
-    cells_even = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
-    cells_odd = [SIS18_Cell_triplet_odd(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps) for _ in 1:6]
+    if cellsIdentical
+        even_cell = SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps)
+        odd_cell = SIS18_Cell_triplet_odd(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps)
+
+        cells_even = [even_cell for _ in 1:6]
+        cells_odd = [odd_cell for _ in 1:6]
+    else
+        cells_even = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
+        cells_odd = [SIS18_Cell_triplet_odd(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps) for _ in 1:6]
+
+    end
+
     lattice = []
     for i in 1:6
         push!(lattice, cells_even[i])
