@@ -149,6 +149,43 @@ function getTunesChroma_ts(model)
     
     return TS.constant_term(Q_x), TS.constant_term(Q_y), TS.constant_term(ξ_x), TS.constant_term(ξ_y)
 end
+
+
+"""
+    get_dispersion(model)
+Calculate dispersion in both planes.
+"""
+function dispersion(model)   
+    old_vars = TS.get_variable_names()
+    old_order = TS.get_order()
+    
+    # obtain one-turn maps
+    origin = TS.set_variables("x a y b σ δ β0β", order=1)
+    origin[7] += 1.;
+
+    dispersion = Matrix{Float64}(undef, 4, length(model))
+
+    cells = collect(1:length(model))
+    for i in 1:length(model)
+        cell_indices = circshift(cells, -i+1)
+
+        p = copy(origin)
+        for idx in cell_indices
+            p = model[idx](p)
+        end
+
+        otm = TL.jacobian(p) .|> TS.constant_term
+        dx_dpx_dy_dpy = -1 * LA.inv(otm[1:4, 1:4] - LA.I) * otm[1:4,6]
+        dispersion[:,i] .= dx_dpx_dy_dpy
+    end
+
+    # restore previous TS setting
+    TS.set_variables(join(old_vars, " "), order=old_order)
+
+    return dispersion
+end
+
+
 """
     function twiss(model)::Dict{Symbol, Any}
 
