@@ -288,10 +288,15 @@ function SIS18_Lattice_QKicker(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Fl
         push!(lattice, cells_odd[i])
     end
 
+    # add pretrack and after drift section
     GS05MQ1_to_GS05DX5H = Flux.Chain(d1, lattice[end][6:end]...)
-    allCells = [GS05MQ1_to_GS05DX5H, lattice...]
 
-    return ThinLens.NestedChain(allCells)
+    drift2 = ThinLens.Drift(lattice[end][5].len - d1.len)
+    Sector5_Start_to_QKicker = Flux.Chain(lattice[end][1:4]..., drift2)
+
+    allCells = [GS05MQ1_to_GS05DX5H, lattice..., Sector5_Start_to_QKicker]
+
+    return ThinLens.NestedChain(allCells)  # this lattice contains sector 5 twice!!
 
 end
 
