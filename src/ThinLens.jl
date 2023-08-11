@@ -27,6 +27,8 @@ include("ThickTrack.jl")
 # convenience methods
 include("Lattice.jl")
 include("Tools.jl")
+include("Twiss.jl")
+
 
 @precompile_setup begin
     # Putting some things in `setup` can reduce the size of the
