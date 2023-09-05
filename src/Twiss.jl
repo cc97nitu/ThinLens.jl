@@ -74,6 +74,9 @@ end
 
 
 function periodic(model, beam)
+    old_vars = TS.get_variable_names()
+    old_order = TS.get_order()
+
     # determine one-turn map
     origin = TS.set_variables("x a y b σ δ β0β", order=1)
 
@@ -109,9 +112,13 @@ function periodic(model, beam)
     dx = @. (W_s[1,6,:] - W_s[1,5,:] * W_s[5,6,:] / W_s[5,5,:]) / (W_s[6,6,:] - W_s[6,5,:] * W_s[5,6,:] / W_s[5,5,:])
     dpx = @. (W_s[2,6,:] - W_s[2,5,:] * W_s[5,6,:] / W_s[5,5,:]) / (W_s[6,6,:] - W_s[6,5,:] * W_s[5,6,:] / W_s[5,5,:])
     
+    # restore previous TS setting
+    TS.set_variables(join(old_vars, " "), order=old_order)
+
     # twiss
     return Dict(:W_s => W_s,
         :βx => W_s[1,1,:].^2, :βy => W_s[3,3,:].^2,
+        :αx => -W_s[2,1,:] .* W_s[1,1,:].^2, :αy => -W_s[4,3,:] .* W_s[3,3,:].^2,
         :μx => ψx, :μy => ψy, :q1 => ψx[end]/(2π), :q2 => ψy[end]/(2π),
         :dx => dx, :dpx => dpx,
     )
