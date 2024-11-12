@@ -58,7 +58,8 @@ precompile(track, (Flux.Chain{NTuple{12, Flux.Chain{Tuple{Drift, BendingMagnet, 
 Return dict which maps kn to their corresponding mask.
 """
 function assignMasks(model::Flux.Chain;
-    nested::Bool=true, quadMask::Union{Vector{Float64}, Nothing}=nothing, sextMask::Union{Vector{Float64}, Nothing}=nothing, bendMask::Union{Vector{Float64}, Nothing}=nothing
+    nested::Bool=true, quadMask::Union{Vector{Float64}, Nothing}=nothing, tripletMask::Union{Vector{Float64}, Nothing}=nothing,
+    sextMask::Union{Vector{Float64}, Nothing}=nothing, bendMask::Union{Vector{Float64}, Nothing}=nothing
     )::IdDict{Vector{Float64}, Vector{Float64}}
 
     masks = IdDict{Vector{Float64}, Vector{Float64}}()
@@ -66,8 +67,12 @@ function assignMasks(model::Flux.Chain;
     if nested
         for cell in model
             for element in cell
-                if typeof(element) == Quadrupole && !isnothing(quadMask) 
-                    masks[element.kn] = quadMask
+                if typeof(element) == Quadrupole && !isnothing(quadMask)
+                    if element.len == 0.4804
+                        masks[element.kn] = tripletMask
+                    else
+                        masks[element.kn] = quadMask
+                    end
                 elseif typeof(element) == Sextupole && !isnothing(sextMask)
                     masks[element.kn] = sextMask
                 elseif typeof(element) == BendingMagnet && !isnothing(bendMask)
@@ -78,8 +83,12 @@ function assignMasks(model::Flux.Chain;
     else
         for element in model
             if typeof(element) == Quadrupole && !isnothing(quadMask) 
-                masks[element.kn] = quadMask
-            elseif typeof(element) == Sextupole && !isnothing(sextMask)
+                if element.len == 0.4804
+                    masks[element.kn] = tripletMask
+                else
+                    masks[element.kn] = quadMask
+                end
+        elseif typeof(element) == Sextupole && !isnothing(sextMask)
                 masks[element.kn] = sextMask
             elseif typeof(element) == BendingMagnet && !isnothing(bendMask)
                 masks[element.kn] = bendMask

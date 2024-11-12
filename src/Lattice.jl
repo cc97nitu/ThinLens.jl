@@ -221,7 +221,7 @@ function SIS18_Cell_triplet_odd(k1f::Float64, k1d::Float64, k1t::Float64, k2f::F
     ks3c = ThinLens.Sextupole(0.32, k2d, 0; split=split, steps=steps)
    
     # drifts
-    d1 = ThinLens.Drift(0.221334)
+    d1 = ThinLens.Drift(0.5235)
     d2 = ThinLens.Drift(0.862668)
     d3a = ThinLens.Drift(6.290334)
     d3b = ThinLens.Drift(0.175)
@@ -229,7 +229,7 @@ function SIS18_Cell_triplet_odd(k1f::Float64, k1d::Float64, k1t::Float64, k2f::F
     d5a = ThinLens.Drift(0.195)
     d5b = ThinLens.Drift(0.195)
 
-    hMon = ThinLens.Drift(0.87)
+    hMon = ThinLens.Drift(0.5678340000000001)
 
     # set up beamline
     #Flux.Chain(d1, rb1, d2, rb2 d3a, ks1c, d3b, qs1f, d4, qs2d, d5a, ks3c, d5b, qs3t, d6a, hMon, vMonDrift, d6b)  # actual layout
@@ -250,13 +250,13 @@ function SIS18_Cell_triplet_even(k1f::Float64, k1d::Float64, k1t::Float64; split
     qs3t = ThinLens.Quadrupole(0.4804, k1t, 0; split=split, steps=steps)
    
     # drifts
-    d1 = ThinLens.Drift(0.221334)
+    d1 = ThinLens.Drift(0.5235)
     d2 = ThinLens.Drift(0.862668)
     d3 = ThinLens.Drift(6.290334 + 0.32 + 0.175)
     d4 = ThinLens.Drift(0.6)
     d5 = ThinLens.Drift(0.195 + 0.32 + 0.195)
 
-    hMon = ThinLens.Drift(0.87)
+    hMon = ThinLens.Drift(0.5678340000000001)
 
     # set up beamline
     #Flux.Chain(d1, rb1, d2, rb2 d3a, ks1c, d3b, qs1f, d4, qs2d, d5a, ks3c, d5b, qs3t, d6a, hMon, vMonDrift, d6b)  # actual layout
@@ -265,20 +265,28 @@ end
 
 
 function SIS18_Lattice_QKicker(k1f::Float64, k1d::Float64, k1t::Float64, k2f::Float64, k2d::Float64;
+    split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1, cellsIdentical::Bool=false) 
+
+    return SIS18_Lattice_QKicker(k1f, k1d, k1f, k1d, k1t, k2f, k2d; split=split, steps=steps, cellsIdentical=cellsIdentical)
+end
+
+
+function SIS18_Lattice_QKicker(k1_GS01QS1F::Float64, k1_GS01QS2D::Float64, k1_GS12QS3T::Float64, k1_GS12QS1F::Float64, k1_GS12QS2D::Float64,
+    k2f::Float64, k2d::Float64;
     split::ThinLens.SplitScheme=ThinLens.splitO2nd, steps::Int=1, cellsIdentical::Bool=false)   
     # distance between kicker GS05MQ1 to GS05KS1C
     d1 = ThinLens.Drift(3.082)
 
     # set up beamline
     if cellsIdentical
-        even_cell = SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps)
-        odd_cell = SIS18_Cell_triplet_odd(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps)
+        even_cell = SIS18_Cell_triplet_even(k1_GS12QS1F, k1_GS12QS2D, k1_GS12QS3T; split=split, steps=steps)
+        odd_cell = SIS18_Cell_triplet_odd(k1_GS01QS1F, k1_GS01QS2D, k1_GS12QS3T, k2f, k2d; split=split, steps=steps)
 
         cells_even = [even_cell for _ in 1:6]
         cells_odd = [odd_cell for _ in 1:6]
     else
-        cells_even = [SIS18_Cell_triplet_even(k1f, k1d, k1t; split=split, steps=steps) for _ in 1:6]
-        cells_odd = [SIS18_Cell_triplet_odd(k1f, k1d, k1t, k2f, k2d; split=split, steps=steps) for _ in 1:6]
+        cells_even = [SIS18_Cell_triplet_even(k1_GS12QS1F, k1_GS12QS2D, k1_GS12QS3T; split=split, steps=steps) for _ in 1:6]
+        cells_odd = [SIS18_Cell_triplet_odd(k1_GS01QS1F, k1_GS01QS2D, k1_GS12QS3T, k2f, k2d; split=split, steps=steps) for _ in 1:6]
 
     end
 
